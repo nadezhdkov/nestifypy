@@ -1,0 +1,18 @@
+project:
+  name: "Pynest"
+  version: "0.1.0"
+  description: "Modern utility and game framework for Python"
+
+python:
+  version: "3.11"
+  dependencies:
+    - pygame==2.6.1
+
+build:
+  backend: "uv"
+
+docker:
+  image: "pynest:latest"
+
+authors:
+  - name: "rickmviana"

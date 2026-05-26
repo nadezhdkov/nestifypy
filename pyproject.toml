@@ -1,0 +1,103 @@
+[build-system]
+requires = ["setuptools>=69.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pynest"
+dynamic = ["version"]
+description = "Modern utility and game framework for Python"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+  {name = "rickmviana"}
+]
+keywords = ["game", "framework", "utility", "yaml", "pygame", "ecs", "env"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Games/Entertainment",
+]
+
+dependencies = [
+  "pyyaml>=6.0",
+  "python-dotenv>=1.0",
+  "typer>=0.12",
+  "watchdog>=4.0",
+  "pygame>=2.6.1",
+]
+
+[project.optional-dependencies]
+game = ["pygame>=2.5"]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=4.1",
+  "ruff>=0.4",
+  "mypy>=1.10",
+  "black>=24.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/rickmviana/pynest"
+Repository = "https://github.com/rickmviana/pynest"
+"Bug Tracker" = "https://github.com/rickmviana/pynest/issues"
+
+[project.scripts]
+pynest = "pynest.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+zip-safe = false
+
+[tool.setuptools.dynamic]
+version = {attr = "pynest.version.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["pynest*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+pynest = ["py.typed"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["UP006", "UP007", "E501"] # Keep standard typing for now
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=pynest --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "except ImportError:"
+]
+
+[dependency-groups]
+dev = [
+    "build>=1.5.0",
+    "twine>=6.2.0",
+]
