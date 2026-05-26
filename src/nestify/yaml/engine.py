@@ -1,5 +1,5 @@
 """
-nestify.yaml.engine
+nestifypy.yaml.engine
 ------------------
 Main YAML engine wrapping the runtime singleton.
 """
@@ -15,9 +15,9 @@ try:
 except ImportError:
     pass
 
-from nestify.core import ConfigError, Logger
-from nestify.yaml.models import DotDict
-from nestify.yaml.runtime import YamlRuntime
+from nestifypy.core import ConfigError, Logger
+from nestifypy.yaml.models import DotDict
+from nestifypy.yaml.runtime import YamlRuntime
 
 
 class YamlEngine:

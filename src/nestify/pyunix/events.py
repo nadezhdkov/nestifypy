@@ -1,5 +1,5 @@
 """
-nestify.pyunix.events
+nestifypy.pyunix.events
 --------------------
 Decoupled event bus for game-wide communication.
 

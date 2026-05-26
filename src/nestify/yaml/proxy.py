@@ -1,5 +1,5 @@
 """
-nestify.yaml.proxy
+nestifypy.yaml.proxy
 -----------------
 Magic module-level routing logic (PEP 562 and __class__ replacement).
 """
@@ -8,8 +8,8 @@ import sys
 import types
 from typing import Any
 
-from nestify.yaml.engine import YamlEngine
-from nestify.yaml.exceptions import YamlPathError
+from nestifypy.yaml.engine import YamlEngine
+from nestifypy.yaml.exceptions import YamlPathError
 
 class YamlModuleProxy(types.ModuleType):
     """

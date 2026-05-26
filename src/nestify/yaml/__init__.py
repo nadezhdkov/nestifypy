@@ -1,5 +1,5 @@
 """
-nestify.yaml
+nestifypy.yaml
 -----------
 Intelligent YAML configuration runtime engine with auto-bootstrap.
 """
@@ -7,11 +7,11 @@ Intelligent YAML configuration runtime engine with auto-bootstrap.
 from typing import Any, Callable, Dict, List, Optional, Union
 from pathlib import Path
 
-from nestify.yaml.engine import YamlEngine
-from nestify.yaml.runtime import YamlRuntime
-from nestify.yaml.models import DotDict
-from nestify.yaml.exceptions import YamlPathError
-from nestify.yaml.proxy import setup_module_proxy
+from nestifypy.yaml.engine import YamlEngine
+from nestifypy.yaml.runtime import YamlRuntime
+from nestifypy.yaml.models import DotDict
+from nestifypy.yaml.exceptions import YamlPathError
+from nestifypy.yaml.proxy import setup_module_proxy
 
 # Legacy export for backwards compatibility
 Yaml = YamlEngine

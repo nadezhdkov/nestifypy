@@ -1,5 +1,5 @@
 """
-nestify.os.dirs
+nestifypy.os.dirs
 --------------
 Clean cross-platform wrappers around directory operations.
 """

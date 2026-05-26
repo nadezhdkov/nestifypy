@@ -1,5 +1,5 @@
 """
-nestify.pyunix.window
+nestifypy.pyunix.window
 --------------------
 Window creation and management wrapper.
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 from typing import Any, Tuple
 
-from nestify.pyunix.exceptions import WindowError
+from nestifypy.pyunix.exceptions import WindowError
 
 try:
     import pygame

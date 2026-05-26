@@ -1,5 +1,5 @@
 """
-nestify.pyunix.input
+nestifypy.pyunix.input
 -------------------
 Decorator-driven input system with action mapping.
 

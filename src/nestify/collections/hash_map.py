@@ -1,5 +1,5 @@
 """
-nestify.collections.hash_map
+nestifypy.collections.hash_map
 ---------------------------
 A fluent wrapper around Python's dictionary.
 

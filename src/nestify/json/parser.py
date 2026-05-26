@@ -1,5 +1,5 @@
 """
-nestify.json.parser
+nestifypy.json.parser
 ------------------
 Parsing logic for JSON strings and files.
 """
@@ -10,10 +10,10 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from nestify.yaml import DotDict
-from nestify.json.exceptions import JsonParseError
-from nestify.json.models import JsonObject
-from nestify.json.utils import to_dotdict
+from nestifypy.yaml import DotDict
+from nestifypy.json.exceptions import JsonParseError
+from nestifypy.json.models import JsonObject
+from nestifypy.json.utils import to_dotdict
 
 class JsonParser:
     """Handles parsing of JSON strings and files."""

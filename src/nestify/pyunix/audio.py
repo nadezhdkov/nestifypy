@@ -1,5 +1,5 @@
 """
-nestify.pyunix.audio
+nestifypy.pyunix.audio
 -------------------
 Audio management for music and sound effects.
 
@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from nestify.pyunix.assets import Assets
-from nestify.pyunix.exceptions import AudioError
+from nestifypy.pyunix.assets import Assets
+from nestifypy.pyunix.exceptions import AudioError
 
 try:
     import pygame

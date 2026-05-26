@@ -1,10 +1,10 @@
 """
-nestify.json.exceptions
+nestifypy.json.exceptions
 ----------------------
 Custom exceptions for the JSON module.
 """
 
-from nestify.core import ConfigError
+from nestifypy.core import ConfigError
 
 class JsonError(ConfigError):
     """Base exception for all JSON-related errors."""

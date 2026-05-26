@@ -1,16 +1,16 @@
 """
-Nestify Quickstart Example
+Nestifypy Quickstart Example
 """
 
-from nestify.core import Logger, Constants
-from nestify.decorators import benchmark, cache, retry, event, emit
-from nestify.types import Vector2, Color, Rect
-from nestify.utils import Strings, Random, Math, Time, Validator
-from nestify.console import Console
-from nestify.flow import Flow
+from nestifypy.core import Logger, Constants
+from nestifypy.decorators import benchmark, cache, retry, event, emit
+from nestifypy.types import Vector2, Color, Rect
+from nestifypy.utils import Strings, Random, Math, Time, Validator
+from nestifypy.console import Console
+from nestifypy.flow import Flow
 
 # Logger
-Logger.info("Nestify starting up!")
+Logger.info("Nestifypy starting up!")
 Logger.warn("Watch out!")
 Logger.success("Ready!")
 
@@ -44,7 +44,7 @@ rect = Rect(0, 0, 100, 100)
 Logger.debug(f"Contains (50,50): {rect.contains(50, 50)}")
 
 # Utils
-Logger.info(Strings.slugify("Hello World! This is Nestify."))
+Logger.info(Strings.slugify("Hello World! This is Nestifypy."))
 Logger.info(f"UUID: {Random.uuid()}")
 Logger.info(f"Clamped: {Math.clamp(150, 0, 100)}")
 Logger.info(f"Now: {Time.format()}")
@@ -64,7 +64,7 @@ Console.table(
         {"module": "pyunix",     "status": "planned", "phase": 2},
         {"module": "ai",         "status": "planned", "phase": 5},
     ],
-    title="Nestify Modules",
+    title="Nestifypy Modules",
 )
 Console.rule()
 

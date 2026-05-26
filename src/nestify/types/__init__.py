@@ -1,5 +1,5 @@
 """
-nestify.types
+nestifypy.types
 ------------
 Custom reusable data structures: Vector2, Color, Position, Rect.
 """

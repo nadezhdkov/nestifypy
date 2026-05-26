@@ -1,7 +1,7 @@
 """
-nestify.core
+nestifypy.core
 -----------
-The heart of the Nestify framework.
+The heart of the Nestifypy framework.
 Provides Logger, Exceptions, Constants, Registry, and Plugin systems.
 """
 
@@ -55,11 +55,11 @@ class _Colors:
 # ─────────────────────────────────────────────
 
 class Logger:
-    """Colored, timestamped logger for Nestify."""
+    """Colored, timestamped logger for Nestifypy."""
 
     _level: LogLevel = LogLevel.DEBUG
     _file_path: Optional[Path] = None
-    _prefix: str = "nestify"
+    _prefix: str = "nestifypy"
 
     @classmethod
     def set_level(cls, level: LogLevel) -> None:
@@ -128,23 +128,23 @@ class Logger:
 #  Custom Exceptions
 # ─────────────────────────────────────────────
 
-class NestifyError(Exception):
-    """Base exception for all Nestify errors."""
+class NestifypyError(Exception):
+    """Base exception for all Nestifypy errors."""
 
 
-class ConfigError(NestifyError):
+class ConfigError(NestifypyError):
     """Raised when configuration is invalid or missing."""
 
 
-class PluginError(NestifyError):
+class PluginError(NestifypyError):
     """Raised when a plugin fails to load or register."""
 
 
-class ValidationError(NestifyError):
+class ValidationError(NestifypyError):
     """Raised when a validation check fails."""
 
 
-class RegistryError(NestifyError):
+class RegistryError(NestifypyError):
     """Raised when a registry operation fails."""
 
 
@@ -279,7 +279,7 @@ __all__ = [
     "Registry",
     "Plugin",
     "Constants",
-    "NestifyError",
+    "NestifypyError",
     "ConfigError",
     "PluginError",
     "ValidationError",

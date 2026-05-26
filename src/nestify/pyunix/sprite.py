@@ -1,5 +1,5 @@
 """
-nestify.pyunix.sprite
+nestifypy.pyunix.sprite
 --------------------
 Sprite and collision system designed for ECS compatibility.
 Decorators define entity lifecycle hooks.
@@ -19,7 +19,7 @@ from __future__ import annotations
 import math
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from nestify.pyunix.physics import Collider, PhysicsWorld, Rigidbody
+from nestifypy.pyunix.physics import Collider, PhysicsWorld, Rigidbody
 
 try:
     import pygame

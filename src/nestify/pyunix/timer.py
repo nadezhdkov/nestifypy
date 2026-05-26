@@ -1,5 +1,5 @@
 """
-nestify.pyunix.timer
+nestifypy.pyunix.timer
 -------------------
 Game-aware timer system integrated into the engine loop.
 

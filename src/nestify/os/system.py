@@ -1,5 +1,5 @@
 """
-nestify.os.system
+nestifypy.os.system
 ----------------
 Clean cross-platform wrappers around system information.
 """

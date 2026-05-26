@@ -1,5 +1,5 @@
 """
-nestify.pyunix.fonts
+nestifypy.pyunix.fonts
 -------------------
 Font asset management and caching system.
 """

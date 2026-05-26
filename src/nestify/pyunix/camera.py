@@ -1,5 +1,5 @@
 """
-nestify.pyunix.camera
+nestifypy.pyunix.camera
 --------------------
 Camera system for rendering offsets, follow, screenshake, and zoom.
 
@@ -17,7 +17,7 @@ from __future__ import annotations
 import random
 from typing import Any, Tuple
 
-from nestify.pyunix.sprite import Entity
+from nestifypy.pyunix.sprite import Entity
 
 
 class CameraSystem:

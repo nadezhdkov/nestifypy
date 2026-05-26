@@ -1,7 +1,7 @@
 """
-nestify.decorators
+nestifypy.decorators
 -----------------
-A comprehensive decorator toolkit for Nestify.
+A comprehensive decorator toolkit for Nestifypy.
 All decorators preserve metadata via functools.wraps.
 """
 

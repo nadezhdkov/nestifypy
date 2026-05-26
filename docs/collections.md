@@ -1,10 +1,10 @@
-# Collections (`nestify.collections`)
+# Collections (`nestifypy.collections`)
 
 A suite of Java-inspired, strongly-typed (via hints), fluent data structures optimized for game development and specific architectural patterns.
 
 ## Import
 ```python
-from nestify.collections import ArrayList, LinkedList, Stack, Queue, OrderedSet, HashMap
+from nestifypy.collections import ArrayList, LinkedList, Stack, Queue, OrderedSet, HashMap
 ```
 
 ## 1. ArrayList

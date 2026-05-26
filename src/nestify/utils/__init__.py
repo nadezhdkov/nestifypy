@@ -1,5 +1,5 @@
 """
-nestify.utils
+nestifypy.utils
 ------------
 General helper utilities: strings, random, time, math, colors, validation.
 """

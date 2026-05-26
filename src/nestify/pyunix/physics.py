@@ -1,5 +1,5 @@
 """
-nestify.pyunix.physics
+nestifypy.pyunix.physics
 ---------------------
 Rigidbody physics system for 2D games, supporting dynamic, kinematic, and static bodies,
 collision detection, sensor queries, and physics materials.
@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from nestify.types import Vector2
+from nestifypy.types import Vector2
 
 try:
     import pygame

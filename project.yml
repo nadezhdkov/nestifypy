@@ -1,5 +1,5 @@
 project:
-  name: "Nestify"
+  name: "Nestifypy"
   version: "0.1.0"
   description: "Modern utility and game framework for Python"
 
@@ -12,7 +12,7 @@ build:
   backend: "uv"
 
 docker:
-  image: "nestify:latest"
+  image: "nestifypy:latest"
 
 authors:
   - name: "rickmviana"

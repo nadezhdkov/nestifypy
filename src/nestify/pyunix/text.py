@@ -1,5 +1,5 @@
 """
-nestify.pyunix.text
+nestifypy.pyunix.text
 ------------------
 Declarative UI text rendering with rich formatting.
 """
@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import Any, Optional, Tuple
 
-from nestify.pyunix.fonts import Fonts
-from nestify.pyunix.sprite import Entity, Sprite
-from nestify.types import Color
+from nestifypy.pyunix.fonts import Fonts
+from nestifypy.pyunix.sprite import Entity, Sprite
+from nestifypy.types import Color
 
 try:
     import pygame

@@ -1,5 +1,5 @@
 """
-nestify.json.models
+nestifypy.json.models
 ------------------
 Type definitions and models for the JSON module.
 """

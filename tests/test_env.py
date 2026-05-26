@@ -1,12 +1,12 @@
 """
 tests/test_env.py
 -----------------
-Tests for the Nestify Env module, including new decorators.
+Tests for the Nestifypy Env module, including new decorators.
 """
 
 import os
 import pytest
-from nestify.env import Env
+from nestifypy.env import Env
 
 @pytest.fixture(autouse=True)
 def clean_env():

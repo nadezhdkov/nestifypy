@@ -1,14 +1,14 @@
 """
-nestify.json.validator
+nestifypy.json.validator
 ---------------------
 Schema validation for JSON objects.
 """
 
 from typing import Dict, List, Type, Union
 
-from nestify.yaml import DotDict
-from nestify.json.exceptions import JsonValidationError
-from nestify.json.models import JsonObject
+from nestifypy.yaml import DotDict
+from nestifypy.json.exceptions import JsonValidationError
+from nestifypy.json.models import JsonObject
 
 class JsonValidator:
     """Handles schema validation for JSON objects."""

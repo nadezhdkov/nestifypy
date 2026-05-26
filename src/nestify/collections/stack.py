@@ -1,5 +1,5 @@
 """
-nestify.collections.stack
+nestifypy.collections.stack
 ------------------------
 A fluent LIFO stack implementation.
 

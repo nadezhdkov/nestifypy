@@ -1,5 +1,5 @@
 """
-nestify.json.serializer
+nestifypy.json.serializer
 ----------------------
 Serialization logic for JSON strings and files.
 """
@@ -10,8 +10,8 @@ import json
 from pathlib import Path
 from typing import Any, Union
 
-from nestify.yaml import DotDict
-from nestify.core import Logger
+from nestifypy.yaml import DotDict
+from nestifypy.core import Logger
 
 class JsonSerializer:
     """Handles serialization of Python objects to JSON."""

@@ -1,7 +1,7 @@
 """
-nestify.yaml.metadata
+nestifypy.yaml.metadata
 --------------------
-Manages persistent registry metadata and file hashes/mtimes in .nestify/
+Manages persistent registry metadata and file hashes/mtimes in .nestifypy/
 """
 
 import json
@@ -10,22 +10,22 @@ from typing import Any, Dict, Optional, Tuple
 
 class MetadataManager:
     """
-    Manages `.nestify/` storage for incremental scanning and registry persistence.
+    Manages `.nestifypy/` storage for incremental scanning and registry persistence.
     """
 
     def __init__(self, project_root: Path) -> None:
         self.project_root = project_root.resolve()
-        self.nestify_dir = self.project_root / ".nestify"
-        self.index_file = self.nestify_dir / "yaml_index.json"
-        self.meta_file = self.nestify_dir / "yaml_metadata.json"
+        self.nestifypy_dir = self.project_root / ".nestifypy"
+        self.index_file = self.nestifypy_dir / "yaml_index.json"
+        self.meta_file = self.nestifypy_dir / "yaml_metadata.json"
 
         # Memory state
         self._metadata: Dict[str, Dict[str, Any]] = {}
         self._ensure_dir()
 
     def _ensure_dir(self) -> None:
-        if not self.nestify_dir.exists():
-            self.nestify_dir.mkdir(parents=True, exist_ok=True)
+        if not self.nestifypy_dir.exists():
+            self.nestifypy_dir.mkdir(parents=True, exist_ok=True)
 
     def load_index(self) -> Dict[str, str]:
         """Load the persisted path registry index."""

@@ -1,7 +1,7 @@
 """
 tests/test_collections.py
 -------------------------
-Basic test suite for Nestify Collections module.
+Basic test suite for Nestifypy Collections module.
 """
 
 import pytest
@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from nestify.collections import (
+from nestifypy.collections import (
     ArrayList, LinkedList, Stack, Queue, OrderedSet, HashMap
 )
 

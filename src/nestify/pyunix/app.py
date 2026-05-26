@@ -1,5 +1,5 @@
 """
-nestify.pyunix.app
+nestifypy.pyunix.app
 -----------------
 The core engine runtime and Game decorator.
 
@@ -23,10 +23,10 @@ from __future__ import annotations
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from nestify.pyunix.camera import Camera
-from nestify.pyunix.physics import PhysicsWorld
-from nestify.pyunix.events import Event
-from nestify.pyunix.input import (
+from nestifypy.pyunix.camera import Camera
+from nestifypy.pyunix.physics import PhysicsWorld
+from nestifypy.pyunix.events import Event
+from nestifypy.pyunix.input import (
     _ACTION_HANDLERS,
     _ACTION_MAP,
     _KEY_DOWN_HANDLERS,
@@ -36,10 +36,10 @@ from nestify.pyunix.input import (
     _MOUSE_MOTION_HANDLERS,
     _resolve_key,
 )
-from nestify.pyunix.scene import Scene
-from nestify.pyunix.text import Text
-from nestify.pyunix.timer import Timer
-from nestify.pyunix.window import Window
+from nestifypy.pyunix.scene import Scene
+from nestifypy.pyunix.text import Text
+from nestifypy.pyunix.timer import Timer
+from nestifypy.pyunix.window import Window
 
 try:
     import pygame
@@ -282,7 +282,7 @@ class GameAPI:
     register methods to the engine's main loop.
     """
 
-    def __call__(self, title: str = "Nestify Game", size: Tuple[int, int] = (800, 600), fps: int = 60, **kwargs: Any) -> Callable:
+    def __call__(self, title: str = "Nestifypy Game", size: Tuple[int, int] = (800, 600), fps: int = 60, **kwargs: Any) -> Callable:
         """
         Class decorator that transforms a standard class into a runnable game.
 
@@ -290,7 +290,7 @@ class GameAPI:
         methods into the decorated class.
 
         Args:
-            title (str): The window title. Defaults to "Nestify Game".
+            title (str): The window title. Defaults to "Nestifypy Game".
             size (Tuple[int, int]): Window resolution (width, height). Defaults to (800, 600).
             fps (int): Target frames per second. Defaults to 60.
             **kwargs (Any): Additional arguments passed to Pygame window creation (e.g., flags).

@@ -1,6 +1,6 @@
 # Pyunix Game Framework
 
-`nestify.pyunix` is a highly declarative, decorator-driven game framework built on top of `pygame`. It abstracts away the complex game loop, delta-time calculations, input mapping, and rendering logic so you can focus entirely on game architecture.
+`nestifypy.pyunix` is a highly declarative, decorator-driven game framework built on top of `pygame`. It abstracts away the complex game loop, delta-time calculations, input mapping, and rendering logic so you can focus entirely on game architecture.
 
 ---
 
@@ -9,7 +9,7 @@
 The entry point is the `@Game` decorator. It completely hides the standard `while running:` Pygame loop.
 
 ```python
-from nestify.pyunix import Game, Color, Window
+from nestifypy.pyunix import Game, Color, Window
 
 @Game(title="Cyberpunk 2077 Demake", size=(1280, 720), fps=60)
 class MyGame:
@@ -51,7 +51,7 @@ if __name__ == "__main__":
 Hardcoding `pygame.K_SPACE` leads to spaghetti code. Pyunix uses an Action Mapping system, allowing you to bind multiple physical keys to logical actions, and attach decorators directly to them.
 
 ```python
-from nestify.pyunix import Input
+from nestifypy.pyunix import Input
 
 # Map multiple keys to logical actions
 Input.bind_action("jump", "SPACE", "UP", "W")
@@ -81,7 +81,7 @@ class PlayerController:
 The `Entity` and `SpriteGroup` systems replace massive `update()` monoliths with modular, self-contained objects.
 
 ```python
-from nestify.pyunix import Entity, Sprite, SpriteGroup, Assets
+from nestifypy.pyunix import Entity, Sprite, SpriteGroup, Assets
 
 class Enemy(Entity):
     @Sprite.ready
@@ -125,7 +125,7 @@ if player.distance_to(item) < 50.0:
 Instead of complex `if state == "MENU":` logic, use the Stack-based `SceneManager`.
 
 ```python
-from nestify.pyunix import Scene
+from nestifypy.pyunix import Scene
 
 @Scene("main_menu")
 class MainMenu:
@@ -151,7 +151,7 @@ Scene.pop()
 Decouple your game objects using the global Event Bus.
 
 ```python
-from nestify.pyunix import Event
+from nestifypy.pyunix import Event
 
 # Listener
 @Event.on("level_up")
@@ -170,7 +170,7 @@ Pyunix provides built-in managers for complex game math.
 
 ### The Camera
 ```python
-from nestify.pyunix import Camera
+from nestifypy.pyunix import Camera
 
 # Smoothly lerp towards a target Entity
 Camera.follow(player, smooth=0.1)
@@ -184,7 +184,7 @@ enemies.draw(screen, offset=(Camera.x, Camera.y))
 
 ### Audio
 ```python
-from nestify.pyunix import Audio
+from nestifypy.pyunix import Audio
 
 Audio.play_music("cyberpunk_theme.ogg", loop=True)
 Audio.play_sfx("laser.wav", volume=0.5)
@@ -193,7 +193,7 @@ Audio.play_sfx("laser.wav", volume=0.5)
 ### Timers
 A timer system that inherently respects `dt` and game pauses.
 ```python
-from nestify.pyunix import Timer
+from nestifypy.pyunix import Timer
 
 # Fire and forget
 Timer.after(2.0, lambda: print("Bomb exploded!"))
@@ -209,7 +209,7 @@ Timer.every(0.5, spawn_enemy)
 Pyunix includes a built-in 2D physics system. Add a `Rigidbody` and `Collider` to any `Entity` to integrate it into the `PhysicsWorld`.
 
 ```python
-from nestify.pyunix import Entity, Rigidbody, BodyType, BoxCollider, PhysicsMaterial
+from nestifypy.pyunix import Entity, Rigidbody, BodyType, BoxCollider, PhysicsMaterial
 
 class Player(Entity):
     def __init__(self, x, y):
@@ -243,7 +243,7 @@ class Player(Entity):
 ### Sensor Queries
 The `PhysicsWorld` can be queried to find objects in specific areas.
 ```python
-from nestify.pyunix import PhysicsWorld
+from nestifypy.pyunix import PhysicsWorld
 
 # Find all entities in a rectangular area that are in the "enemy" layer
 enemies = PhysicsWorld.overlap_rect((0, 0, 100, 100), mask={"enemy"})
@@ -257,7 +257,7 @@ Pyunix provides a declarative text system that automatically handles caching, ou
 
 First, load your fonts:
 ```python
-from nestify.pyunix import Fonts
+from nestifypy.pyunix import Fonts
 
 Fonts.load("main", "assets/fonts/PressStart2P.ttf")
 ```
@@ -271,7 +271,7 @@ def draw_score(self):
 
 You can also create standalone `Text` entities:
 ```python
-from nestify.pyunix import Text
+from nestifypy.pyunix import Text
 
 title = Text(
     "GAME OVER",

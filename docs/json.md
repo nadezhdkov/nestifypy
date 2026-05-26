@@ -1,11 +1,11 @@
 # JSON Utilities
 
-`nestify.json` is a simple wrapper for JSON processing, providing dot-notation access to dictionaries (similar to `nestify.yaml`) and robust file I/O operations.
+`nestifypy.json` is a simple wrapper for JSON processing, providing dot-notation access to dictionaries (similar to `nestifypy.yaml`) and robust file I/O operations.
 
 ## 1. Quick Start
 
 ```python
-from nestify.json import Json
+from nestifypy.json import Json
 
 # Read a JSON file
 data = Json.load("data/users.json")
@@ -16,10 +16,10 @@ Json.save("data/output.json", {"status": "success", "code": 200})
 
 ## 2. DotDict Usage
 
-Nestify uses a `DotDict` wrapper allowing you to access nested dictionary keys as object attributes.
+Nestifypy uses a `DotDict` wrapper allowing you to access nested dictionary keys as object attributes.
 
 ```python
-from nestify.json import DotDict
+from nestifypy.json import DotDict
 
 user_data = {
     "user": {
@@ -45,7 +45,7 @@ If you need to serialize Python objects (e.g. Dataclasses, Enum) to JSON, use th
 
 ```python
 from dataclasses import dataclass
-from nestify.json import Json
+from nestifypy.json import Json
 
 @dataclass
 class Config:

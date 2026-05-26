@@ -1,17 +1,17 @@
 """
-nestify.pyunix
+nestifypy.pyunix
 -------------
 A lightweight, declarative, decorator-driven game framework built on pygame.
 """
 
-from nestify.pyunix.app import Game
-from nestify.pyunix.assets import Assets
-from nestify.pyunix.audio import Audio
-from nestify.pyunix.camera import Camera
-from nestify.pyunix.events import Event
-from nestify.pyunix.exceptions import PyunixError
-from nestify.pyunix.input import Input
-from nestify.pyunix.physics import (
+from nestifypy.pyunix.app import Game
+from nestifypy.pyunix.assets import Assets
+from nestifypy.pyunix.audio import Audio
+from nestifypy.pyunix.camera import Camera
+from nestifypy.pyunix.events import Event
+from nestifypy.pyunix.exceptions import PyunixError
+from nestifypy.pyunix.input import Input
+from nestifypy.pyunix.physics import (
     BodyType,
     BoxCollider,
     CircleCollider,
@@ -21,12 +21,12 @@ from nestify.pyunix.physics import (
     PhysicsWorld,
     Rigidbody,
 )
-from nestify.pyunix.scene import Scene
-from nestify.pyunix.sprite import Entity, Sprite, SpriteGroup
-from nestify.pyunix.fonts import Fonts
-from nestify.pyunix.text import Text
-from nestify.pyunix.timer import Timer
-from nestify.pyunix.window import Window
+from nestifypy.pyunix.scene import Scene
+from nestifypy.pyunix.sprite import Entity, Sprite, SpriteGroup
+from nestifypy.pyunix.fonts import Fonts
+from nestifypy.pyunix.text import Text
+from nestifypy.pyunix.timer import Timer
+from nestifypy.pyunix.window import Window
 
 __all__ = [
     "Game",

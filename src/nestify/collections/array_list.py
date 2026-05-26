@@ -1,5 +1,5 @@
 """
-nestify.collections.array_list
+nestifypy.collections.array_list
 -----------------------------
 A fluent, Java-inspired wrapper around Python's built-in list.
 

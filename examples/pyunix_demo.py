@@ -1,10 +1,10 @@
 """
-Example demonstrating the declarative Nestify Pyunix game framework.
+Example demonstrating the declarative Nestifypy Pyunix game framework.
 Run this script to see the game loop and decorators in action.
 """
 
-from nestify.pyunix import Game, Input, Entity, Sprite, SpriteGroup, Window
-from nestify.types import Color
+from nestifypy.pyunix import Game, Input, Entity, Sprite, SpriteGroup, Window
+from nestifypy.types import Color
 import pygame
 
 # We will create a simple player entity

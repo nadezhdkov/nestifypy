@@ -1,5 +1,5 @@
 """
-nestify.json.engine
+nestifypy.json.engine
 ------------------
 Main orchestrator for the JSON module.
 """
@@ -9,16 +9,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Optional, Type, Union
 
-from nestify.yaml import DotDict
-from nestify.json.parser import JsonParser
-from nestify.json.serializer import JsonSerializer
-from nestify.json.validator import JsonValidator
-from nestify.json.utils import deep_merge
-from nestify.json.models import JsonObject
+from nestifypy.yaml import DotDict
+from nestifypy.json.parser import JsonParser
+from nestifypy.json.serializer import JsonSerializer
+from nestifypy.json.validator import JsonValidator
+from nestifypy.json.utils import deep_merge
+from nestifypy.json.models import JsonObject
 
 class Json:
     """
-    Nestify JSON engine.
+    Nestifypy JSON engine.
     
     Usage:
         config = Json.load("config.json")

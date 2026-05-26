@@ -1,10 +1,10 @@
-# Decorators (`nestify.decorators`)
+# Decorators (`nestifypy.decorators`)
 
-Nestify includes a comprehensive suite of utility decorators to add caching, validation, error handling, and event structures to your functions cleanly. All decorators preserve function metadata using `functools.wraps`.
+Nestifypy includes a comprehensive suite of utility decorators to add caching, validation, error handling, and event structures to your functions cleanly. All decorators preserve function metadata using `functools.wraps`.
 
 ## Import
 ```python
-from nestify.decorators import *
+from nestifypy.decorators import *
 ```
 
 ## Execution & Performance

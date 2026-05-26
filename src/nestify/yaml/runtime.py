@@ -1,5 +1,5 @@
 """
-nestify.yaml.runtime
+nestifypy.yaml.runtime
 -------------------
 Singleton runtime state manager for the YAML engine.
 """
@@ -7,13 +7,13 @@ Singleton runtime state manager for the YAML engine.
 from pathlib import Path
 import threading
 
-from nestify.yaml.registry import PathRegistry
-from nestify.yaml.cache import ConfigCache
-from nestify.yaml.metadata import MetadataManager
-from nestify.yaml.scanner import YamlScanner
-from nestify.yaml.watcher import YamlWatcher
-from nestify.yaml.bootstrap import discover_project_root
-from nestify.yaml.models import DotDict
+from nestifypy.yaml.registry import PathRegistry
+from nestifypy.yaml.cache import ConfigCache
+from nestifypy.yaml.metadata import MetadataManager
+from nestifypy.yaml.scanner import YamlScanner
+from nestifypy.yaml.watcher import YamlWatcher
+from nestifypy.yaml.bootstrap import discover_project_root
+from nestifypy.yaml.models import DotDict
 
 class YamlRuntime:
     """Manages the lifecycle, state, and auto-bootstrap of the YAML engine."""

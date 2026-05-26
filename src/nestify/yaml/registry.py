@@ -1,5 +1,5 @@
 """
-nestify.yaml.registry
+nestifypy.yaml.registry
 --------------------
 Thread-safe Path registry for the YAML engine.
 """

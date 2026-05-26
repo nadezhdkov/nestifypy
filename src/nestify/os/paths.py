@@ -1,5 +1,5 @@
 """
-nestify.os.paths
+nestifypy.os.paths
 ---------------
 Clean cross-platform wrappers around path utilities.
 """

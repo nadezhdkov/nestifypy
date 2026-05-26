@@ -1,5 +1,5 @@
 """
-nestify.collections.linked_list
+nestifypy.collections.linked_list
 ------------------------------
 A fluent doubly-linked list implementation.
 

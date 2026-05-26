@@ -8,8 +8,8 @@ we will mock or only test the logical infrastructure (events, timers, registries
 
 import pytest
 
-from nestify.pyunix import Event, Timer, Scene, Input
-from nestify.pyunix.sprite import Entity, Sprite, SpriteGroup
+from nestifypy.pyunix import Event, Timer, Scene, Input
+from nestifypy.pyunix.sprite import Entity, Sprite, SpriteGroup
 
 
 def test_event_bus():
@@ -116,5 +116,5 @@ def test_input_action_mapping():
     Input.bind_action("jump", "SPACE")
     Input.bind_action("jump", "W")
     
-    from nestify.pyunix.input import _ACTION_MAP
+    from nestifypy.pyunix.input import _ACTION_MAP
     assert _ACTION_MAP["jump"] == ["SPACE", "W"]

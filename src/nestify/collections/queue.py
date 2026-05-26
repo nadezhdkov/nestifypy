@@ -1,5 +1,5 @@
 """
-nestify.collections.queue
+nestifypy.collections.queue
 ------------------------
 A fluent FIFO queue implementation.
 

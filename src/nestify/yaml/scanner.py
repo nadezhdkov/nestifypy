@@ -1,5 +1,5 @@
 """
-nestify.yaml.scanner
+nestifypy.yaml.scanner
 -------------------
 Incremental filesystem scanner for YAML configurations.
 """
@@ -12,11 +12,11 @@ try:
 except ImportError:
     pass
 
-from nestify.core import Logger
-from nestify.yaml.models import DotDict
-from nestify.yaml.registry import PathRegistry
-from nestify.yaml.cache import ConfigCache
-from nestify.yaml.metadata import MetadataManager
+from nestifypy.core import Logger
+from nestifypy.yaml.models import DotDict
+from nestifypy.yaml.registry import PathRegistry
+from nestifypy.yaml.cache import ConfigCache
+from nestifypy.yaml.metadata import MetadataManager
 
 class YamlScanner:
     """Handles discovering and incrementally scanning YAML files."""

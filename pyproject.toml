@@ -3,7 +3,7 @@ requires = ["setuptools>=69.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nestify"
+name = "nestifypy"
 dynamic = ["version"]
 description = "Modern utility and game framework for Python"
 readme = "README.md"
@@ -44,27 +44,27 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rickmviana/nestify"
-Repository = "https://github.com/rickmviana/nestify"
-"Bug Tracker" = "https://github.com/rickmviana/nestify/issues"
+Homepage = "https://github.com/rickmviana/nestifypy"
+Repository = "https://github.com/rickmviana/nestifypy"
+"Bug Tracker" = "https://github.com/rickmviana/nestifypy/issues"
 
 [project.scripts]
-nestify = "nestify.cli:main"
+nestifypy = "nestifypy.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 zip-safe = false
 
 [tool.setuptools.dynamic]
-version = {attr = "nestify.version.__version__"}
+version = {attr = "nestifypy.version.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["nestify*"]
+include = ["nestifypy*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-nestify = ["py.typed"]
+nestifypy = ["py.typed"]
 
 [tool.ruff]
 line-length = 88
@@ -81,7 +81,7 @@ strict = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=nestify --cov-report=term-missing"
+addopts = "-v --cov=nestifypy --cov-report=term-missing"
 
 [tool.coverage.run]
 source = ["src"]

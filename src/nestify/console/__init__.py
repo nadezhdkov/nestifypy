@@ -1,5 +1,5 @@
 """
-nestify.console
+nestifypy.console
 --------------
 Modern terminal tools: colored printing, tables, progress bars, input helpers.
 """

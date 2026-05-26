@@ -1,5 +1,5 @@
 """
-nestify.os.files
+nestifypy.os.files
 ---------------
 Clean cross-platform wrappers around file operations.
 """

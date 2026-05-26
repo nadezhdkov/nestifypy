@@ -1,10 +1,10 @@
-# Control Flow (`nestify.flow`)
+# Control Flow (`nestifypy.flow`)
 
 The `Flow` class is a namespace grouping decorators and utility methods for advanced task scheduling, repetition, throttling, and concurrency.
 
 ## Import
 ```python
-from nestify.flow import Flow
+from nestifypy.flow import Flow
 ```
 
 ## Scheduled Execution

@@ -1,11 +1,11 @@
 """
-nestify.json.utils
+nestifypy.json.utils
 -----------------
 Internal utilities for the JSON module.
 """
 
 from typing import Any, Dict
-from nestify.yaml import DotDict
+from nestifypy.yaml import DotDict
 
 def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     """

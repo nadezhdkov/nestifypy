@@ -1,5 +1,5 @@
 """
-nestify.yaml.watcher
+nestifypy.yaml.watcher
 -------------------
 Background daemon thread for hot-reloading YAML files with debounce.
 """
@@ -8,7 +8,7 @@ import threading
 import time
 from typing import Callable, Dict, List, Any, Optional
 from pathlib import Path
-from nestify.core import Logger
+from nestifypy.core import Logger
 
 class YamlWatcher:
     """Manages file watching and debounced hot reloading for YAML configurations."""
@@ -105,7 +105,7 @@ class YamlWatcher:
 
             except ImportError:
                 Logger.warn(
-                    "[Nestify:Yaml] Watchdog not installed. "
+                    "[Nestifypy:Yaml] Watchdog not installed. "
                     "Hot reload functionality is disabled. "
                     "Install 'watchdog' to enable automatic file watching."
                 )

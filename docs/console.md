@@ -1,10 +1,10 @@
-# Console Tools (`nestify.console`)
+# Console Tools (`nestifypy.console`)
 
 The `Console` module provides modern, rich terminal output utilities including colored printing, structured tables, progress bars, interactive input helpers, and animated spinners.
 
 ## Import
 ```python
-from nestify.console import Console
+from nestifypy.console import Console
 ```
 
 ## 1. Colored Printing

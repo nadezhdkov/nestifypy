@@ -1,5 +1,5 @@
 """
-nestify.pyunix.assets
+nestifypy.pyunix.assets
 --------------------
 Asset loading and caching manager.
 
@@ -18,7 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from nestify.pyunix.exceptions import AssetError
+from nestifypy.pyunix.exceptions import AssetError
 
 try:
     import pygame

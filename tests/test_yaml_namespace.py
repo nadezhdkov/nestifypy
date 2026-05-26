@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from nestify.yaml import Yaml
+from nestifypy.yaml import Yaml
 
 Path("test_db.yml").write_text("database:\n  host: localhost\n  port: 5432")
 

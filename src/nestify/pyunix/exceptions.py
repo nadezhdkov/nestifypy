@@ -1,5 +1,5 @@
 """
-nestify.pyunix.exceptions
+nestifypy.pyunix.exceptions
 -------------------------
 Custom exceptions for the Pyunix game framework.
 """

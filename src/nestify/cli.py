@@ -1,8 +1,8 @@
 """
-nestify.cli
+nestifypy.cli
 ----------
-CLI entry point for the Nestify ecosystem.
-Registered via pyproject.toml: nestify = "nestify.cli:main"
+CLI entry point for the Nestifypy ecosystem.
+Registered via pyproject.toml: nestifypy = "nestifypy.cli:main"
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ from typing import Optional
 import typer
 
 app = typer.Typer(
-    name="nestify",
-    help="Nestify — Modern utility and game framework for Python",
+    name="nestifypy",
+    help="Nestifypy — Modern utility and game framework for Python",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -52,7 +52,7 @@ version = "0.1.0"
 description = ""
 requires-python = ">={python_version}"
 dependencies = [
-    "nestify>=0.1.0"
+    "nestifypy>=0.1.0"
 ]
 
 [project.optional-dependencies]
@@ -88,12 +88,12 @@ venv/
 dist/
 build/
 *.egg-info/
-.nestify/
+.nestifypy/
 """
 
 _DEFAULT_MAIN = """\
-from nestify.core import Logger
-from nestify.env import Env
+from nestifypy.core import Logger
+from nestifypy.env import Env
 
 def main() -> None:
     Env.load()
@@ -120,13 +120,13 @@ def init(
         False, "--force", "-f", help="Overwrite existing files"
     ),
 ) -> None:
-    """Initialize a new Nestify project in the current directory."""
+    """Initialize a new Nestifypy project in the current directory."""
 
     # Resolve project name
     if name is None:
         name = Path.cwd().name
 
-    typer.echo(f"\n🪺  Initializing Nestify project: [bold]{name}[/bold]\n", color=True)
+    typer.echo(f"\n🪺  Initializing Nestifypy project: [bold]{name}[/bold]\n", color=True)
 
     files = {
         "project.yml":  _DEFAULT_PROJECT_YML.format(name=name, python_version=python),
@@ -158,7 +158,7 @@ def init(
     typer.echo(f"\n✅  Project [bold]{name}[/bold] ready!\n")
     typer.echo("  Next steps:")
     typer.echo("    uv sync")
-    typer.echo("    nestify run\n")
+    typer.echo("    nestifypy run\n")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -279,7 +279,7 @@ def doctor() -> None:
     import importlib
     import platform
 
-    typer.echo("\n🩺  Nestify Doctor\n")
+    typer.echo("\n🩺  Nestifypy Doctor\n")
 
     typer.echo(f"  Python     : {platform.python_version()}")
     typer.echo(f"  Platform   : {platform.system()} {platform.machine()}")
@@ -309,7 +309,7 @@ def doctor() -> None:
     if Path("project.yml").exists():
         typer.echo("  ✓  project.yml found")
     else:
-        typer.echo("  –  project.yml not found  (run: nestify init)")
+        typer.echo("  –  project.yml not found  (run: nestifypy init)")
 
     typer.echo()
 
@@ -324,7 +324,7 @@ def clean() -> None:
     import shutil
 
     targets = [
-        "dist", "build", ".nestify",
+        "dist", "build", ".nestifypy",
         "__pycache__", ".mypy_cache", ".ruff_cache",
     ]
     removed = []
@@ -353,12 +353,12 @@ def info() -> None:
         import yaml
         cfg_path = Path("project.yml")
         if not cfg_path.exists():
-            typer.echo("❌  project.yml not found. Run: nestify init")
+            typer.echo("❌  project.yml not found. Run: nestifypy init")
             raise typer.Exit(1)
         with open(cfg_path) as f:
             cfg = yaml.safe_load(f)
 
-        typer.echo("\n🪺  Nestify Project Info\n")
+        typer.echo("\n🪺  Nestifypy Project Info\n")
         proj = cfg.get("project", {})
         typer.echo(f"  Name        : {proj.get('name', '-')}")
         typer.echo(f"  Version     : {proj.get('version', '-')}")

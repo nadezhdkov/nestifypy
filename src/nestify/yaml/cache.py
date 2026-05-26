@@ -1,12 +1,12 @@
 """
-nestify.yaml.cache
+nestifypy.yaml.cache
 -----------------
 Memory cache for loaded YAML configurations.
 """
 
 from typing import Dict, Optional
 import threading
-from nestify.yaml.models import DotDict
+from nestifypy.yaml.models import DotDict
 
 class ConfigCache:
     """Stores resolved YAML configurations (thread-safe memory only)."""

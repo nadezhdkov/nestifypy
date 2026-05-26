@@ -1,13 +1,13 @@
-# Environment Variables (`nestify.env`)
+# Environment Variables (`nestifypy.env`)
 
-`nestify.env` provides a clean, typed wrapper around `python-dotenv`. It lets you load `.env` files easily, cast variables safely, and use descriptors for a declarative configuration architecture.
+`nestifypy.env` provides a clean, typed wrapper around `python-dotenv`. It lets you load `.env` files easily, cast variables safely, and use descriptors for a declarative configuration architecture.
 
 ## 1. Quick Start
 
 Loading the environment and grabbing variables:
 
 ```python
-from nestify.env import Env
+from nestifypy.env import Env
 
 # Loads .env from the current directory
 Env.load()
@@ -27,7 +27,7 @@ debug = Env.bool("DEBUG_MODE", default=False)
 Instead of fetching variables inline, you can define your application configuration declaratively using the `EnvProperty` descriptor. This maps an environment variable directly to a class attribute.
 
 ```python
-from nestify.env import Env
+from nestifypy.env import Env
 
 class DatabaseConfig:
     host = Env.property("DB_HOST", default="localhost")
@@ -44,7 +44,7 @@ print(f"Connecting to {cfg.host}:{cfg.port} (SSL: {cfg.use_ssl})")
 You can automatically inject environment variables into function arguments using the `@Env.inject` decorator. It only injects the variable if the caller doesn't provide it.
 
 ```python
-from nestify.env import Env
+from nestifypy.env import Env
 
 @Env.inject(api_token="SECRET_TOKEN")
 def connect_to_service(api_token: str = None):

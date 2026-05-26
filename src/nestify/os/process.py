@@ -1,5 +1,5 @@
 """
-nestify.os.process
+nestifypy.os.process
 -----------------
 Clean cross-platform wrappers around subprocess operations.
 """

@@ -1,5 +1,5 @@
 """
-nestify.collections.ordered_set
+nestifypy.collections.ordered_set
 ------------------------------
 A fluent insertion-ordered set.
 

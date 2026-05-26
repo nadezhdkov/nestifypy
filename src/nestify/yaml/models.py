@@ -1,5 +1,5 @@
 """
-nestify.yaml.models
+nestifypy.yaml.models
 ------------------
 Data structures for the YAML module.
 """

@@ -1,5 +1,5 @@
 """
-nestify.pyunix.scene
+nestifypy.pyunix.scene
 -------------------
 Scene and state management system.
 
@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List
 
-from nestify.pyunix.exceptions import SceneError
+from nestifypy.pyunix.exceptions import SceneError
 
 
 class SceneManager:
