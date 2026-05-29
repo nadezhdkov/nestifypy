@@ -1,222 +1,243 @@
 """
 nestifypy.collections.linked_list
-------------------------------
-A fluent doubly-linked list implementation.
+----------------------------------
+A fluent doubly-linked list wrapping ``collections.deque``.
 
-This module provides a `LinkedList` class that wraps Python's highly optimized
-`collections.deque` to offer a doubly-linked list data structure. It features
-an object-oriented API with support for method chaining and functional operations.
+Provides O(1) operations at both ends, functional transformations, and
+seamless :class:`~nestifypy.collections.stream.Stream` interoperability.
+
+Example::
+
+    from nestifypy.collections import LinkedList
+
+    ll = (
+        LinkedList([1, 2, 3])
+        .add_first(0)
+        .add_last(4)
+        .map(lambda x: x * 2)
+        .filter(lambda x: x > 2)
+    )
+    # LinkedList([4, 6, 8])
 """
 
 from __future__ import annotations
 
 import collections
-from typing import Any, Callable, Generic, Iterable, Iterator, Optional, TypeVar
+import functools
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+    TYPE_CHECKING,
+)
 
 T = TypeVar("T")
 U = TypeVar("U")
+K = TypeVar("K")
+R = TypeVar("R")
+
 
 class LinkedList(Generic[T]):
     """
-    A doubly-linked list wrapping Python's collections.deque.
+    A doubly-linked list wrapping ``collections.deque`` with a fluent API.
 
-    Provides efficient $O(1)$ operations for adding and removing elements from
-    both ends, while offering a chainable API for fluent data manipulation.
+    Mutation methods return ``self``; transformation methods return new instances.
     """
 
+    __slots__ = ("_data",)
+
     def __init__(self, items: Optional[Iterable[T]] = None) -> None:
-        """
-        Initialize a new LinkedList.
+        self._data: collections.deque[T] = collections.deque(
+            items if items is not None else []
+        )
 
-        Args:
-            items (Optional[Iterable[T]]): An iterable of elements to populate
-                the list initially. If None, an empty list is created. Defaults to None.
-        """
-        self._data: collections.deque[T] = collections.deque(items if items is not None else [])
+    # ------------------------------------------------------------------
+    # Factories
+    # ------------------------------------------------------------------
 
-    def add_first(self, item: T) -> LinkedList[T]:
-        """
-        Add an item to the beginning (left side) of the list.
+    @classmethod
+    def of(cls, *items: T) -> "LinkedList[T]":
+        return cls(items)
 
-        Args:
-            item (T): The item to add.
+    @classmethod
+    def empty(cls) -> "LinkedList[T]":
+        return cls()
 
-        Returns:
-            LinkedList[T]: The current LinkedList instance to allow method chaining.
-        """
+    # ------------------------------------------------------------------
+    # Mutation
+    # ------------------------------------------------------------------
+
+    def add_first(self, item: T) -> "LinkedList[T]":
+        """Prepend *item* (O(1))."""
         self._data.appendleft(item)
         return self
 
-    def add_last(self, item: T) -> LinkedList[T]:
-        """
-        Add an item to the end (right side) of the list.
-
-        Args:
-            item (T): The item to add.
-
-        Returns:
-            LinkedList[T]: The current LinkedList instance to allow method chaining.
-        """
+    def add_last(self, item: T) -> "LinkedList[T]":
+        """Append *item* (O(1))."""
         self._data.append(item)
         return self
 
+    def add_all_last(self, items: Iterable[T]) -> "LinkedList[T]":
+        """Extend from the right."""
+        self._data.extend(items)
+        return self
+
     def remove_first(self) -> T:
-        """
-        Remove and return the first item from the list.
-
-        Raises:
-            IndexError: If the list is empty when remove_first is called.
-
-        Returns:
-            T: The item that was at the beginning of the list.
-        """
+        """Remove and return the first element (O(1))."""
         if not self._data:
             raise IndexError("remove_first from empty LinkedList")
         return self._data.popleft()
 
     def remove_last(self) -> T:
-        """
-        Remove and return the last item from the list.
-
-        Raises:
-            IndexError: If the list is empty when remove_last is called.
-
-        Returns:
-            T: The item that was at the end of the list.
-        """
+        """Remove and return the last element (O(1))."""
         if not self._data:
             raise IndexError("remove_last from empty LinkedList")
         return self._data.pop()
 
-    def peek_first(self) -> Optional[T]:
-        """
-        Return the first item of the list without removing it.
+    def remove(self, item: T) -> "LinkedList[T]":
+        """Remove the first occurrence of *item*; no-op if not present."""
+        try:
+            self._data.remove(item)
+        except ValueError:
+            pass
+        return self
 
-        Returns:
-            Optional[T]: The first item, or None if the list is empty.
-        """
-        return self._data[0] if self._data else None
+    def remove_if(self, predicate: Callable[[T], bool]) -> "LinkedList[T]":
+        """Remove all elements for which *predicate* returns True (mutates in place)."""
+        self._data = collections.deque(item for item in self._data if not predicate(item))
+        return self
 
-    def peek_last(self) -> Optional[T]:
-        """
-        Return the last item of the list without removing it.
-
-        Returns:
-            Optional[T]: The last item, or None if the list is empty.
-        """
-        return self._data[-1] if self._data else None
-
-    def contains(self, item: T) -> bool:
-        """
-        Check if the list contains the specified item.
-
-        Args:
-            item (T): The item to check for.
-
-        Returns:
-            bool: True if the item exists in the list, False otherwise.
-        """
-        return item in self._data
-
-    def is_empty(self) -> bool:
-        """
-        Check if the list has no elements.
-
-        Returns:
-            bool: True if the list is empty, False otherwise.
-        """
-        return len(self._data) == 0
-
-    def size(self) -> int:
-        """
-        Get the total number of items currently in the list.
-
-        Returns:
-            int: The size of the list.
-        """
-        return len(self._data)
-
-    def clear(self) -> LinkedList[T]:
-        """
-        Remove all items from the list.
-
-        Returns:
-            LinkedList[T]: The current LinkedList instance to allow method chaining.
-        """
+    def clear(self) -> "LinkedList[T]":
         self._data.clear()
         return self
 
-    def filter(self, predicate: Callable[[T], bool]) -> LinkedList[T]:
-        """
-        Create a new LinkedList containing only items that match the given predicate.
+    def reverse(self) -> "LinkedList[T]":
+        """Reverse in place (O(n))."""
+        self._data.reverse()
+        return self
 
-        Args:
-            predicate (Callable[[T], bool]): A function that evaluates each item and
-                returns True to keep the item or False to drop it.
+    # ------------------------------------------------------------------
+    # Inspection
+    # ------------------------------------------------------------------
 
-        Returns:
-            LinkedList[T]: A new LinkedList with the filtered items.
-        """
-        return LinkedList([item for item in self._data if predicate(item)])
+    def peek_first(self) -> Optional[T]:
+        return self._data[0] if self._data else None
 
-    def map(self, transform: Callable[[T], U]) -> LinkedList[U]:
-        """
-        Create a new LinkedList with the results of applying the transform function
-        to each item.
+    def peek_last(self) -> Optional[T]:
+        return self._data[-1] if self._data else None
 
-        Args:
-            transform (Callable[[T], U]): A function that takes an item of type T
-                and returns a new value of type U.
+    def contains(self, item: T) -> bool:
+        return item in self._data
 
-        Returns:
-            LinkedList[U]: A new LinkedList containing the transformed items.
-        """
-        return LinkedList([transform(item) for item in self._data])
+    def is_empty(self) -> bool:
+        return not self._data
 
-    def to_list(self) -> list[T]:
-        """
-        Convert the LinkedList into a standard Python list.
+    def size(self) -> int:
+        return len(self._data)
 
-        Returns:
-            list[T]: A copy of the underlying items, ordered from first to last.
-        """
+    def count_by(self, predicate: Callable[[T], bool]) -> int:
+        return sum(1 for item in self._data if predicate(item))
+
+    # ------------------------------------------------------------------
+    # Transformation — new instances
+    # ------------------------------------------------------------------
+
+    def map(self, transform: Callable[[T], U]) -> "LinkedList[U]":
+        return LinkedList(transform(item) for item in self._data)
+
+    def filter(self, predicate: Callable[[T], bool]) -> "LinkedList[T]":
+        return LinkedList(item for item in self._data if predicate(item))
+
+    def flat_map(self, transform: Callable[[T], Iterable[U]]) -> "LinkedList[U]":
+        result: List[U] = []
+        for item in self._data:
+            result.extend(transform(item))
+        return LinkedList(result)
+
+    def reduce(self, fn: Callable[[R, T], R], initial: R) -> R:
+        return functools.reduce(fn, self._data, initial)
+
+    def distinct(self) -> "LinkedList[T]":
+        seen: set = set()
+        result: List[T] = []
+        for item in self._data:
+            if item not in seen:
+                seen.add(item)
+                result.append(item)
+        return LinkedList(result)
+
+    def take(self, n: int) -> "LinkedList[T]":
+        return LinkedList(list(self._data)[:n])
+
+    def drop(self, n: int) -> "LinkedList[T]":
+        return LinkedList(list(self._data)[n:])
+
+    def zip_with(self, other: Iterable[U]) -> "LinkedList[Tuple[T, U]]":
+        return LinkedList(zip(self._data, other))
+
+    def group_by(self, key_fn: Callable[[T], K]) -> Dict[K, "LinkedList[T]"]:
+        groups: Dict[K, List[T]] = {}
+        for item in self._data:
+            groups.setdefault(key_fn(item), []).append(item)
+        return {k: LinkedList(v) for k, v in groups.items()}
+
+    def sorted(self, *, key: Optional[Callable[[T], Any]] = None, reverse: bool = False) -> "LinkedList[T]":
+        return LinkedList(sorted(self._data, key=key, reverse=reverse))
+
+    def reversed(self) -> "LinkedList[T]":
+        return LinkedList(reversed(self._data))
+
+    def for_each(self, action: Callable[[T], None]) -> "LinkedList[T]":
+        for item in self._data:
+            action(item)
+        return self
+
+    # ------------------------------------------------------------------
+    # Stream interop
+    # ------------------------------------------------------------------
+
+    def stream(self) -> "Stream[T]":
+        from nestifypy.collections.stream import Stream
+        return Stream(list(self._data))
+
+    # ------------------------------------------------------------------
+    # Conversion
+    # ------------------------------------------------------------------
+
+    def to_list(self) -> List[T]:
         return list(self._data)
 
-    def __iter__(self) -> Iterator[T]:
-        """
-        Iterate over the items in the list from first to last.
+    def to_set(self) -> set:
+        return set(self._data)
 
-        Returns:
-            Iterator[T]: An iterator over the list's elements.
-        """
+    # ------------------------------------------------------------------
+    # Dunder helpers
+    # ------------------------------------------------------------------
+
+    def __iter__(self) -> Iterator[T]:
         return iter(self._data)
 
     def __len__(self) -> int:
-        """
-        Get the number of items in the list (allows `len(linked_list)`).
-
-        Returns:
-            int: The size of the list.
-        """
         return len(self._data)
 
     def __contains__(self, item: Any) -> bool:
-        """
-        Check if an item is in the list (allows `item in linked_list`).
-
-        Args:
-            item (Any): The item to check for.
-
-        Returns:
-            bool: True if the item exists in the list, False otherwise.
-        """
         return item in self._data
 
-    def __repr__(self) -> str:
-        """
-        Get the string representation of the LinkedList.
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, LinkedList):
+            return list(self._data) == list(other._data)
+        return NotImplemented
 
-        Returns:
-            str: A string showing the class name and its elements.
-        """
-        return f"LinkedList({list(self._data)})"
+    def __repr__(self) -> str:
+        return f"LinkedList({list(self._data)!r})"
+
+
+if TYPE_CHECKING:
+    from nestifypy.collections.stream import Stream

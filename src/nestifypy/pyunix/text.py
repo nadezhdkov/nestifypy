@@ -1,16 +1,14 @@
 """
 nestifypy.pyunix.text
-------------------
-Declarative UI text rendering with rich formatting.
+---------------------
+Rich text rendering entity with shadow, outline, word-wrap, and alignment.
 """
-
 from __future__ import annotations
 
-from typing import Any, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
-from nestifypy.pyunix.fonts import Fonts
+from nestifypy.pyunix.math import Color
 from nestifypy.pyunix.sprite import Entity, Sprite
-from nestifypy.types import Color
 
 try:
     import pygame
@@ -19,130 +17,185 @@ except ImportError:
     _HAS_PYGAME = False
 
 
+def _resolve_color(color: Any) -> Tuple[int, int, int]:
+    if isinstance(color, Color):
+        return color.to_rgb()
+    if isinstance(color, str):
+        if color.startswith("#"):
+            return Color.from_hex(color).to_rgb()
+        if _HAS_PYGAME:
+            return pygame.Color(color)[:3]
+        return (255, 255, 255)
+    return tuple(color[:3])
+
+
 class Text(Entity):
     """
-    Declarative text entity with support for rich rendering features.
+    Declarative text entity.
+
+    Supports: shadow, outline, word-wrap, left/center/right alignment,
+    anchor points, and dynamic color/text updates with lazy re-rendering.
     """
-    __slots__ = (
-        "text", "font_name", "size", "color", "shadow", "shadow_color",
-        "shadow_offset", "outline", "outline_color", "outline_size",
-        "align", "anchor", "antialias", "_surface", "_rect"
-    )
 
     def __init__(
         self,
-        text: str,
+        text: str = "",
         x: float = 0.0,
         y: float = 0.0,
-        font: str = "default",
+        font_name: str = "default",
         size: int = 24,
-        color: str | Tuple[int, int, int] | Color = "white",
+        color: Any = "white",
+        bold: bool = False,
+        italic: bool = False,
         shadow: bool = False,
-        shadow_color: str | Tuple[int, int, int] | Color = "black",
+        shadow_color: Any = "black",
         shadow_offset: Tuple[int, int] = (2, 2),
         outline: bool = False,
-        outline_color: str | Tuple[int, int, int] | Color = "black",
+        outline_color: Any = "black",
         outline_size: int = 1,
-        align: str = "left",       # "left", "center", "right"
-        anchor: str = "top_left",  # e.g., "center", "bottom_right"
+        align: str = "left",
+        anchor: str = "topleft",
         layer: str = "ui",
-        antialias: bool = True
+        antialias: bool = True,
+        max_width: Optional[int] = None,   # word-wrap at this pixel width
     ) -> None:
         super().__init__(x=x, y=y, layer=layer)
-        self.text = text
-        self.font_name = font
-        self.size = size
-        self.color = self._parse_color(color)
-        self.shadow = shadow
-        self.shadow_color = self._parse_color(shadow_color)
+        self.text          = text
+        self.font_name     = font_name
+        self.font_size     = size
+        self.color         = _resolve_color(color)
+        self.bold          = bold
+        self.italic        = italic
+        self.shadow        = shadow
+        self.shadow_color  = _resolve_color(shadow_color)
         self.shadow_offset = shadow_offset
-        self.outline = outline
-        self.outline_color = self._parse_color(outline_color)
-        self.outline_size = outline_size
-        self.align = align
-        self.anchor = anchor
-        self.antialias = antialias
-        
+        self.outline       = outline
+        self.outline_color = _resolve_color(outline_color)
+        self.outline_size  = outline_size
+        self.align         = align      # "left" | "center" | "right"
+        self.anchor        = anchor     # pygame Rect attribute name
+        self.antialias     = antialias
+        self.max_width     = max_width
+
         self._surface: Optional[Any] = None
-        self._rect: Optional[Any] = None
+        self._rect:    Optional[Any] = None
+        self._dirty:   bool          = True
 
         if _HAS_PYGAME:
-            self._render()
+            self._rebuild()
 
-    def _parse_color(self, color: Any) -> Tuple[int, int, int]:
-        if isinstance(color, str):
-            # Very basic fallback for named colors if needed, normally Color handles hex
-            # For simplicity, if it's not a hex, let pygame color handle it later or use a predefined dict.
-            if color.startswith("#"):
-                return Color.from_hex(color).to_rgb()
+    # ── Public API ───────────────────────────
+
+    def set_text(self, text: str) -> None:
+        if self.text != text:
+            self.text  = text
+            self._dirty = True
+
+    def set_color(self, color: Any) -> None:
+        self.color  = _resolve_color(color)
+        self._dirty = True
+
+    def set_size(self, size: int) -> None:
+        self.font_size = size
+        self._dirty    = True
+
+    @property
+    def width(self) -> int:
+        return self._surface.get_width() if self._surface else 0
+
+    @property
+    def height(self) -> int:
+        return self._surface.get_height() if self._surface else 0
+
+    # ── Internal rendering ───────────────────
+
+    def _get_font(self) -> Any:
+        from nestifypy.pyunix.fonts import Fonts
+        f = Fonts.get(self.font_name, self.font_size)
+        if f:
+            return f
+        # Fallback: system font
+        return pygame.font.SysFont(None, self.font_size, bold=self.bold, italic=self.italic)
+
+    def _wrap_text(self, font: Any, text: str, max_w: int) -> List[str]:
+        """Word-wrap `text` to fit within `max_w` pixels."""
+        words  = text.split(" ")
+        lines: List[str] = []
+        current = ""
+        for word in words:
+            test = f"{current} {word}".strip()
+            if font.size(test)[0] <= max_w:
+                current = test
             else:
-                return pygame.Color(color)[:3] if _HAS_PYGAME else (255, 255, 255)
-        elif isinstance(color, Color):
-            return color.to_rgb()
-        return color[:3]
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return lines or [""]
 
-    def set_text(self, new_text: str) -> None:
-        if self.text != new_text:
-            self.text = new_text
-            if _HAS_PYGAME:
-                self._render()
-
-    def _render(self) -> None:
-        """Internal method to generate the text surface."""
+    def _rebuild(self) -> None:
         if not _HAS_PYGAME:
             return
+        font = self._get_font()
+        lines = (
+            self._wrap_text(font, self.text, self.max_width)
+            if self.max_width
+            else [self.text]
+        )
 
-        font = Fonts.get(self.font_name, self.size)
-        if not font:
-            return
+        line_surfaces = [font.render(ln, self.antialias, self.color) for ln in lines]
+        line_h  = font.get_linesize()
+        max_w   = max((s.get_width() for s in line_surfaces), default=1)
+        total_h = line_h * len(lines)
 
-        # Basic text render
-        base_surface = font.render(self.text, self.antialias, self.color)
-        base_rect = base_surface.get_rect()
+        pad_x = self.outline_size + (self.shadow_offset[0] if self.shadow else 0)
+        pad_y = self.outline_size + (self.shadow_offset[1] if self.shadow else 0)
 
-        final_width = base_rect.width
-        final_height = base_rect.height
+        w = max_w  + pad_x * 2
+        h = total_h + pad_y * 2
 
-        if self.shadow:
-            final_width += max(0, self.shadow_offset[0])
-            final_height += max(0, self.shadow_offset[1])
+        canvas = pygame.Surface((w, h), pygame.SRCALPHA)
 
-        if self.outline:
-            final_width += self.outline_size * 2
-            final_height += self.outline_size * 2
+        for idx, (line_surf, line_text) in enumerate(zip(line_surfaces, lines)):
+            lw = line_surf.get_width()
+            if self.align == "center":
+                bx = (w - lw) // 2
+            elif self.align == "right":
+                bx = w - lw - pad_x
+            else:
+                bx = pad_x
+            by = pad_y + idx * line_h
 
-        # Create a surface large enough to hold outline/shadow
-        self._surface = pygame.Surface((final_width, final_height), pygame.SRCALPHA)
-        self._rect = self._surface.get_rect()
+            # Shadow
+            if self.shadow:
+                sh_surf = font.render(line_text, self.antialias, self.shadow_color)
+                canvas.blit(sh_surf, (bx + self.shadow_offset[0], by + self.shadow_offset[1]))
 
-        # Calculate base drawing position within the final surface
-        draw_x = self.outline_size if self.outline else 0
-        draw_y = self.outline_size if self.outline else 0
+            # Outline
+            if self.outline:
+                ol_surf = font.render(line_text, self.antialias, self.outline_color)
+                for dx in range(-self.outline_size, self.outline_size + 1):
+                    for dy in range(-self.outline_size, self.outline_size + 1):
+                        if dx == 0 and dy == 0:
+                            continue
+                        canvas.blit(ol_surf, (bx + dx, by + dy))
 
-        # Draw shadow
-        if self.shadow:
-            shadow_surface = font.render(self.text, self.antialias, self.shadow_color)
-            self._surface.blit(shadow_surface, (draw_x + self.shadow_offset[0], draw_y + self.shadow_offset[1]))
+            # Main text
+            canvas.blit(line_surf, (bx, by))
 
-        # Draw outline
-        if self.outline:
-            outline_surface = font.render(self.text, self.antialias, self.outline_color)
-            for dx in range(-self.outline_size, self.outline_size + 1):
-                for dy in range(-self.outline_size, self.outline_size + 1):
-                    if dx == 0 and dy == 0:
-                        continue
-                    self._surface.blit(outline_surface, (draw_x + dx, draw_y + dy))
+        self._surface = canvas
+        self._rect    = canvas.get_rect()
+        self._dirty   = False
 
-        # Draw main text
-        self._surface.blit(base_surface, (draw_x, draw_y))
-
-        # Apply anchor
-        setattr(self._rect, self.anchor, (self.x, self.y))
+    # ── Draw hook ────────────────────────────
 
     @Sprite.draw
     def draw(self, surface: Any) -> None:
-        if _HAS_PYGAME and self._surface and self._rect:
-            # Re-apply anchor in case x/y moved
-            setattr(self._rect, self.anchor, (self.x, self.y))
+        if not _HAS_PYGAME:
+            return
+        if self._dirty:
+            self._rebuild()
+        if self._surface and self._rect:
+            setattr(self._rect, self.anchor, (int(self.x), int(self.y)))
             surface.blit(self._surface, self._rect)
-

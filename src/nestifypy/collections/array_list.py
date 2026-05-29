@@ -1,270 +1,398 @@
 """
 nestifypy.collections.array_list
------------------------------
-A fluent, Java-inspired wrapper around Python's built-in list.
+---------------------------------
+A fluent, Java-inspired wrapper around Python's built-in ``list``.
 
-This module provides an `ArrayList` class that encapsulates a standard Python
-list while offering an object-oriented, chainable API and functional
-programming utilities like `map`, `filter`, and `for_each`.
+Provides a chainable, object-oriented API with functional programming
+utilities (``map``, ``filter``, ``flat_map``, ``reduce``, ``for_each``,
+``group_by``, ``zip_with``, …) and seamless interoperability with
+:class:`~nestifypy.collections.stream.Stream`.
+
+Example::
+
+    from nestifypy.collections import ArrayList
+
+    result = (
+        ArrayList([1, 2, 3, 4, 5])
+        .filter(lambda n: n % 2 == 0)
+        .map(lambda n: n * 10)
+        .to_list()
+    )  # [20, 40]
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, Generic, Iterable, Iterator, List, Optional, TypeVar
+import functools
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+    overload,
+)
 
 T = TypeVar("T")
 U = TypeVar("U")
+K = TypeVar("K")
+R = TypeVar("R")
+
 
 class ArrayList(Generic[T]):
     """
-    A dynamic array implementation wrapping Python's list,
-    providing a fluent, chainable API.
+    A dynamic array wrapping Python's ``list`` with a fluent, chainable API.
+
+    Mutation methods return ``self``; transformation methods return new instances.
     """
+
+    __slots__ = ("_data",)
 
     def __init__(self, items: Optional[Iterable[T]] = None) -> None:
         """
         Initialize a new ArrayList.
 
         Args:
-            items (Optional[Iterable[T]]): An iterable of elements to populate
-                the list initially. If None, an empty list is created. Defaults to None.
+            items (Optional[Iterable[T]]): Seed elements. Defaults to an empty list.
         """
         self._data: List[T] = list(items) if items is not None else []
 
-    def add(self, item: T) -> ArrayList[T]:
-        """
-        Add an item to the end of the list.
+    # ------------------------------------------------------------------
+    # Factories
+    # ------------------------------------------------------------------
 
-        This method mutates the list in place.
+    @classmethod
+    def of(cls, *items: T) -> "ArrayList[T]":
+        """Create an ArrayList from positional arguments."""
+        return cls(items)
 
-        Args:
-            item (T): The item to add.
+    @classmethod
+    def empty(cls) -> "ArrayList[T]":
+        """Create an empty ArrayList."""
+        return cls()
 
-        Returns:
-            ArrayList[T]: The current ArrayList instance to allow method chaining.
-        """
+    # ------------------------------------------------------------------
+    # Mutation — return self for chaining
+    # ------------------------------------------------------------------
+
+    def add(self, item: T) -> "ArrayList[T]":
+        """Append *item* to the end of the list."""
         self._data.append(item)
         return self
 
-    def remove(self, item: T) -> ArrayList[T]:
-        """
-        Remove the first occurrence of an item from the list.
+    def add_all(self, items: Iterable[T]) -> "ArrayList[T]":
+        """Extend the list with all elements from *items*."""
+        self._data.extend(items)
+        return self
 
-        This method mutates the list in place. If the item is not found,
-        the list remains unchanged.
+    def insert(self, index: int, item: T) -> "ArrayList[T]":
+        """Insert *item* before the element at *index*."""
+        self._data.insert(index, item)
+        return self
 
-        Args:
-            item (T): The item to remove.
-
-        Returns:
-            ArrayList[T]: The current ArrayList instance to allow method chaining.
-        """
+    def remove(self, item: T) -> "ArrayList[T]":
+        """Remove the first occurrence of *item*; no-op if not found."""
         if item in self._data:
             self._data.remove(item)
         return self
 
     def remove_at(self, index: int) -> T:
         """
-        Remove and return the item at the specified index.
-
-        Args:
-            index (int): The index of the item to remove.
+        Remove and return the element at *index*.
 
         Raises:
-            IndexError: If the index is out of range.
-
-        Returns:
-            T: The item that was removed from the list.
+            IndexError: If *index* is out of range.
         """
         return self._data.pop(index)
 
-    def contains(self, item: T) -> bool:
-        """
-        Check if the list contains the specified item.
-
-        Args:
-            item (T): The item to check for.
-
-        Returns:
-            bool: True if the item exists in the list, False otherwise.
-        """
-        return item in self._data
-
-    def first(self) -> Optional[T]:
-        """
-        Retrieve the first item in the list.
-
-        Returns:
-            Optional[T]: The first item, or None if the list is empty.
-        """
-        return self._data[0] if self._data else None
-
-    def last(self) -> Optional[T]:
-        """
-        Retrieve the last item in the list.
-
-        Returns:
-            Optional[T]: The last item, or None if the list is empty.
-        """
-        return self._data[-1] if self._data else None
-
-    def is_empty(self) -> bool:
-        """
-        Check if the list has no elements.
-
-        Returns:
-            bool: True if the list is empty, False otherwise.
-        """
-        return len(self._data) == 0
-
-    def size(self) -> int:
-        """
-        Get the total number of items in the list.
-
-        Returns:
-            int: The size of the list.
-        """
-        return len(self._data)
-
-    def clear(self) -> ArrayList[T]:
-        """
-        Remove all items from the list.
-
-        Returns:
-            ArrayList[T]: The current ArrayList instance to allow method chaining.
-        """
-        self._data.clear()
+    def remove_if(self, predicate: Callable[[T], bool]) -> "ArrayList[T]":
+        """Remove all elements for which *predicate* returns True."""
+        self._data = [item for item in self._data if not predicate(item)]
         return self
 
-    def sort(self, key: Optional[Callable[[T], Any]] = None, reverse: bool = False) -> ArrayList[T]:
-        """
-        Sort the list in place.
+    def set(self, index: int, value: T) -> "ArrayList[T]":
+        """Replace the element at *index* with *value*."""
+        self._data[index] = value
+        return self
 
-        Args:
-            key (Optional[Callable[[T], Any]]): A function that serves as a key for the
-                sort comparison. Defaults to None.
-            reverse (bool): If True, the list elements are sorted as if each comparison
-                were reversed (descending). Defaults to False.
-
-        Returns:
-            ArrayList[T]: The current sorted ArrayList instance to allow method chaining.
-        """
+    def sort(self, *, key: Optional[Callable[[T], Any]] = None, reverse: bool = False) -> "ArrayList[T]":
+        """Sort the list in place."""
         self._data.sort(key=key, reverse=reverse)
         return self
 
-    def filter(self, predicate: Callable[[T], bool]) -> ArrayList[T]:
-        """
-        Create a new ArrayList containing only items that match the given predicate.
+    def reverse(self) -> "ArrayList[T]":
+        """Reverse the list in place."""
+        self._data.reverse()
+        return self
 
-        Args:
-            predicate (Callable[[T], bool]): A function that evaluates each item and
-                returns True to keep the item or False to drop it.
+    def clear(self) -> "ArrayList[T]":
+        """Remove all elements."""
+        self._data.clear()
+        return self
+
+    # ------------------------------------------------------------------
+    # Inspection
+    # ------------------------------------------------------------------
+
+    def get(self, index: int) -> T:
+        """Return the element at *index*."""
+        return self._data[index]
+
+    def get_or(self, index: int, default: T) -> T:
+        """Return the element at *index*, or *default* if out of bounds."""
+        try:
+            return self._data[index]
+        except IndexError:
+            return default
+
+    def first(self) -> Optional[T]:
+        """Return the first element, or ``None`` if empty."""
+        return self._data[0] if self._data else None
+
+    def last(self) -> Optional[T]:
+        """Return the last element, or ``None`` if empty."""
+        return self._data[-1] if self._data else None
+
+    def contains(self, item: T) -> bool:
+        """Return ``True`` if *item* is in the list."""
+        return item in self._data
+
+    def index_of(self, item: T) -> int:
+        """Return the first index of *item*, or ``-1`` if not found."""
+        try:
+            return self._data.index(item)
+        except ValueError:
+            return -1
+
+    def is_empty(self) -> bool:
+        """Return ``True`` if the list has no elements."""
+        return not self._data
+
+    def size(self) -> int:
+        """Return the number of elements."""
+        return len(self._data)
+
+    def count_by(self, predicate: Callable[[T], bool]) -> int:
+        """Return the number of elements satisfying *predicate*."""
+        return sum(1 for item in self._data if predicate(item))
+
+    # ------------------------------------------------------------------
+    # Transformation — return new instances
+    # ------------------------------------------------------------------
+
+    def map(self, transform: Callable[[T], U]) -> "ArrayList[U]":
+        """Return a new ArrayList with *transform* applied to each element."""
+        return ArrayList(transform(item) for item in self._data)
+
+    def filter(self, predicate: Callable[[T], bool]) -> "ArrayList[T]":
+        """Return a new ArrayList containing only elements where *predicate* is True."""
+        return ArrayList(item for item in self._data if predicate(item))
+
+    def flat_map(self, transform: Callable[[T], Iterable[U]]) -> "ArrayList[U]":
+        """Apply *transform* (returning an iterable) to each element and flatten one level."""
+        result: List[U] = []
+        for item in self._data:
+            result.extend(transform(item))
+        return ArrayList(result)
+
+    def reduce(self, fn: Callable[[R, T], R], initial: R) -> R:
+        """Fold the list left using *fn*, starting from *initial*."""
+        return functools.reduce(fn, self._data, initial)
+
+    def distinct(self) -> "ArrayList[T]":
+        """Return a new ArrayList with duplicates removed, preserving first-occurrence order."""
+        seen: set = set()
+        result: List[T] = []
+        for item in self._data:
+            if item not in seen:
+                seen.add(item)
+                result.append(item)
+        return ArrayList(result)
+
+    def take(self, n: int) -> "ArrayList[T]":
+        """Return a new ArrayList with the first *n* elements."""
+        return ArrayList(self._data[:n])
+
+    def drop(self, n: int) -> "ArrayList[T]":
+        """Return a new ArrayList skipping the first *n* elements."""
+        return ArrayList(self._data[n:])
+
+    def take_while(self, predicate: Callable[[T], bool]) -> "ArrayList[T]":
+        """Return elements from the front while *predicate* is True."""
+        result: List[T] = []
+        for item in self._data:
+            if predicate(item):
+                result.append(item)
+            else:
+                break
+        return ArrayList(result)
+
+    def drop_while(self, predicate: Callable[[T], bool]) -> "ArrayList[T]":
+        """Drop elements from the front while *predicate* is True; return the rest."""
+        i = 0
+        while i < len(self._data) and predicate(self._data[i]):
+            i += 1
+        return ArrayList(self._data[i:])
+
+    def zip_with(self, other: Iterable[U]) -> "ArrayList[Tuple[T, U]]":
+        """Pair each element with the corresponding element of *other*."""
+        return ArrayList(zip(self._data, other))
+
+    def group_by(self, key_fn: Callable[[T], K]) -> Dict[K, "ArrayList[T]"]:
+        """
+        Group elements by the result of *key_fn*.
 
         Returns:
-            ArrayList[T]: A new ArrayList with the filtered items.
+            Dict[K, ArrayList[T]]: Mapping from key to grouped ArrayList.
         """
-        return ArrayList([item for item in self._data if predicate(item)])
+        groups: Dict[K, List[T]] = {}
+        for item in self._data:
+            groups.setdefault(key_fn(item), []).append(item)
+        return {k: ArrayList(v) for k, v in groups.items()}
 
-    def map(self, transform: Callable[[T], U]) -> ArrayList[U]:
+    def partition(self, predicate: Callable[[T], bool]) -> Tuple["ArrayList[T]", "ArrayList[T]"]:
         """
-        Create a new ArrayList with the results of applying the transform function
-        to each item.
-
-        Args:
-            transform (Callable[[T], U]): A function that takes an item of type T
-                and returns a new value of type U.
+        Split into two ArrayLists: matching and non-matching elements.
 
         Returns:
-            ArrayList[U]: A new ArrayList containing the transformed items.
+            Tuple[ArrayList[T], ArrayList[T]]: (matching, non-matching).
         """
-        return ArrayList([transform(item) for item in self._data])
+        yes: List[T] = []
+        no: List[T] = []
+        for item in self._data:
+            (yes if predicate(item) else no).append(item)
+        return ArrayList(yes), ArrayList(no)
 
-    def for_each(self, action: Callable[[T], None]) -> ArrayList[T]:
+    def chunk(self, size: int) -> "ArrayList[ArrayList[T]]":
         """
-        Apply a given action (function) to each item in the list.
+        Split the list into chunks of *size* elements. Last chunk may be smaller.
 
         Args:
-            action (Callable[[T], None]): A function to execute for each item.
+            size (int): Chunk size (must be >= 1).
 
         Returns:
-            ArrayList[T]: The current ArrayList instance to allow method chaining.
+            ArrayList[ArrayList[T]]: ArrayList of chunks.
         """
+        if size < 1:
+            raise ValueError(f"chunk size must be >= 1, got {size}")
+        return ArrayList(
+            ArrayList(self._data[i : i + size]) for i in range(0, len(self._data), size)
+        )
+
+    def flatten(self) -> "ArrayList[Any]":
+        """Flatten one level when elements are themselves iterables."""
+        result: List[Any] = []
+        for item in self._data:
+            try:
+                result.extend(item)  # type: ignore[arg-type]
+            except TypeError:
+                result.append(item)
+        return ArrayList(result)
+
+    def sorted(self, *, key: Optional[Callable[[T], Any]] = None, reverse: bool = False) -> "ArrayList[T]":
+        """Return a new sorted ArrayList (non-mutating)."""
+        return ArrayList(sorted(self._data, key=key, reverse=reverse))
+
+    def reversed(self) -> "ArrayList[T]":
+        """Return a new reversed ArrayList (non-mutating)."""
+        return ArrayList(reversed(self._data))
+
+    def enumerate(self, start: int = 0) -> "ArrayList[Tuple[int, T]]":
+        """Pair each element with its index."""
+        return ArrayList(builtins_enumerate(self._data, start))
+
+    # ------------------------------------------------------------------
+    # Side effects — no return value
+    # ------------------------------------------------------------------
+
+    def for_each(self, action: Callable[[T], None]) -> "ArrayList[T]":
+        """Execute *action* for each element; supports chaining."""
         for item in self._data:
             action(item)
         return self
 
-    def to_list(self) -> List[T]:
+    # ------------------------------------------------------------------
+    # Stream interop
+    # ------------------------------------------------------------------
+
+    def stream(self) -> "Stream[T]":
         """
-        Convert the ArrayList back into a standard Python list.
+        Return a :class:`~nestifypy.collections.stream.Stream` backed by a
+        copy of this list, enabling lazy pipeline operations.
 
         Returns:
-            List[T]: A shallow copy of the underlying list.
+            Stream[T]: A new Stream.
         """
+        from nestifypy.collections.stream import Stream
+        return Stream(list(self._data))
+
+    # ------------------------------------------------------------------
+    # Conversion
+    # ------------------------------------------------------------------
+
+    def to_list(self) -> List[T]:
+        """Return a shallow copy as a plain Python list."""
         return list(self._data)
 
-    def __iter__(self) -> Iterator[T]:
-        """
-        Iterate over the elements in the list.
+    def to_set(self) -> set:
+        """Return the elements as a plain Python set."""
+        return set(self._data)
 
-        Returns:
-            Iterator[T]: An iterator over the list's elements.
-        """
+    # ------------------------------------------------------------------
+    # Dunder helpers
+    # ------------------------------------------------------------------
+
+    def __iter__(self) -> Iterator[T]:
         return iter(self._data)
 
     def __len__(self) -> int:
-        """
-        Get the number of items in the list (allows `len(array_list)`).
-
-        Returns:
-            int: The size of the list.
-        """
         return len(self._data)
 
-    def __getitem__(self, index: int) -> T:
-        """
-        Get an item using square bracket notation (`array_list[index]`).
+    @overload
+    def __getitem__(self, index: int) -> T: ...
+    @overload
+    def __getitem__(self, index: slice) -> "ArrayList[T]": ...
 
-        Args:
-            index (int): The index of the item to retrieve.
-
-        Raises:
-            IndexError: If the index is out of bounds.
-
-        Returns:
-            T: The item at the specified index.
-        """
+    def __getitem__(self, index: int | slice) -> "T | ArrayList[T]":
+        if isinstance(index, slice):
+            return ArrayList(self._data[index])
         return self._data[index]
 
     def __setitem__(self, index: int, value: T) -> None:
-        """
-        Set an item using square bracket notation (`array_list[index] = value`).
-
-        Args:
-            index (int): The index where the value should be set.
-            value (T): The value to store at the given index.
-
-        Raises:
-            IndexError: If the index is out of bounds.
-        """
         self._data[index] = value
 
     def __contains__(self, item: Any) -> bool:
-        """
-        Check if an item is in the list (allows `item in array_list`).
-
-        Args:
-            item (Any): The item to check for.
-
-        Returns:
-            bool: True if the item exists, False otherwise.
-        """
         return item in self._data
 
-    def __repr__(self) -> str:
-        """
-        Get the string representation of the ArrayList.
+    def __add__(self, other: "ArrayList[T]") -> "ArrayList[T]":
+        return ArrayList(self._data + list(other))
 
-        Returns:
-            str: A string showing the class name and its underlying list.
-        """
-        return f"ArrayList({self._data})"
+    def __iadd__(self, other: Iterable[T]) -> "ArrayList[T]":
+        self._data.extend(other)
+        return self
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ArrayList):
+            return self._data == other._data
+        if isinstance(other, list):
+            return self._data == other
+        return NotImplemented
+
+    def __hash__(self) -> int:  # type: ignore[override]
+        return hash(tuple(self._data))
+
+    def __repr__(self) -> str:
+        return f"ArrayList({self._data!r})"
+
+
+import builtins as _builtins
+builtins_enumerate = _builtins.enumerate
+
+# Avoid circular import at module level
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from nestifypy.collections.stream import Stream

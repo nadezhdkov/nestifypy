@@ -1,277 +1,280 @@
 """
 nestifypy.pyunix.scene
--------------------
-Scene and state management system.
-
-This module provides a stack-based scene manager, allowing isolated game
-or application states to be pushed, popped, and switched smoothly.
-It supports load and unload lifecycle hooks via decorators.
+----------------------
+Stack-based scene / game-state manager with transition support.
 
 Usage:
     @Scene("menu")
     class MenuScene:
         @Scene.load
-        def setup(self):
-            print("Menu loaded")
+        def on_load(self):
+            self.title = Text("Main Menu", x=400, y=200, size=48, anchor="center")
 
         @Scene.unload
-        def cleanup(self):
-            print("Menu unloaded")
+        def on_unload(self):
+            pass   # clean up if needed
+
+        @Scene.update
+        def on_update(self, dt):
+            ...
+
+        @Scene.draw
+        def on_draw(self, surface):
+            surface.fill((20, 20, 30))
+            self.title.draw(surface)
 
     Scene.push("menu")
-"""
 
+    # Inside the game loop, forward calls:
+    Scene.update(dt)
+    Scene.draw(screen)
+"""
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from nestifypy.pyunix.exceptions import SceneError
 
 
+# ---------------------------------------------------------------------------
+# SceneManager (internal)
+# ---------------------------------------------------------------------------
+
 class SceneManager:
     """
-    Manages isolated game scenes using a stack architecture.
-
-    Attributes:
-        _scenes (Dict[str, Any]): A registry mapping scene names to their classes.
-        _stack (List[str]): The stack of currently active scene names.
-        _instances (Dict[str, Any]): A cache of instantiated scene objects.
+    Internal stack-based scene manager.
+    Supports push/pop/switch, per-scene update/draw forwarding,
+    and optional cross-fade transitions (if pygame is available).
     """
 
-    __slots__ = ("_scenes", "_stack", "_instances")
+    __slots__ = (
+        "_scenes", "_stack", "_instances",
+        "_transition_duration", "_transition_elapsed",
+        "_transitioning",
+    )
 
     def __init__(self) -> None:
-        """Initialize an empty SceneManager."""
-        self._scenes: Dict[str, Any] = {}
-        self._stack: List[str] = []
-        self._instances: Dict[str, Any] = {}
+        self._scenes:    Dict[str, Type]  = {}
+        self._stack:     List[str]        = []
+        self._instances: Dict[str, Any]   = {}
+        # Transition fade state
+        self._transition_duration: float  = 0.0
+        self._transition_elapsed:  float  = 0.0
+        self._transitioning:       bool   = False
+
+    # ── Registration ─────────────────────────
 
     def register(self, name: str) -> Callable:
-        """
-        Decorator to register a scene class under a specific name.
-
-        Args:
-            name (str): The unique string identifier for the scene.
-
-        Returns:
-            Callable: The class decorator.
-        """
         def decorator(cls: Any) -> Any:
             self._scenes[name] = cls
             return cls
         return decorator
 
-    def load_hook(self, func: Callable) -> Callable:
-        """
-        Decorator to mark a method as the scene's load hook.
+    # ── Hook decorators (attached to user class methods) ──────────────────
 
-        The load hook is automatically called when the scene is pushed
-        onto the stack or becomes the active scene again.
-
-        Args:
-            func (Callable): The method to decorate.
-
-        Returns:
-            Callable: The decorated method with a special metadata attribute.
-        """
+    @staticmethod
+    def load_hook(func: Callable) -> Callable:
         func._pyunix_scene = "load"
         return func
 
-    def unload_hook(self, func: Callable) -> Callable:
-        """
-        Decorator to mark a method as the scene's unload hook.
-
-        The unload hook is automatically called when the scene is popped
-        from the stack or hidden by another scene being pushed.
-
-        Args:
-            func (Callable): The method to decorate.
-
-        Returns:
-            Callable: The decorated method with a special metadata attribute.
-        """
+    @staticmethod
+    def unload_hook(func: Callable) -> Callable:
         func._pyunix_scene = "unload"
         return func
 
+    @staticmethod
+    def update_hook(func: Callable) -> Callable:
+        func._pyunix_scene = "update"
+        return func
+
+    @staticmethod
+    def draw_hook(func: Callable) -> Callable:
+        func._pyunix_scene = "draw"
+        return func
+
+    @staticmethod
+    def pause_hook(func: Callable) -> Callable:
+        func._pyunix_scene = "pause"
+        return func
+
+    @staticmethod
+    def resume_hook(func: Callable) -> Callable:
+        func._pyunix_scene = "resume"
+        return func
+
+    # ── Stack operations ─────────────────────
+
     def push(self, name: str) -> None:
-        """
-        Push a scene onto the stack and transition to it.
-
-        This will trigger the `unload` hook of the current scene (if any),
-        instantiate the new scene if it hasn't been created yet, and trigger
-        the `load` hook of the new scene.
-
-        Args:
-            name (str): The name of the scene to push.
-
-        Raises:
-            SceneError: If the requested scene name has not been registered.
-        """
+        """Push a new scene on the stack (pauses the current scene)."""
         if name not in self._scenes:
-            raise SceneError(f"Scene not found: {name}")
-
-        # Unload current scene if any
+            raise SceneError(f"Scene '{name}' not registered.")
         if self._stack:
-            current_name = self._stack[-1]
-            if current_name in self._instances:
-                self._dispatch(self._instances[current_name], "unload")
-
+            self._dispatch(self._get_instance(self._stack[-1]), "pause")
         self._stack.append(name)
-
-        # Create instance if needed
-        if name not in self._instances:
-            self._instances[name] = self._scenes[name]()
-
-        # Load new scene
-        self._dispatch(self._instances[name], "load")
+        self._dispatch(self._get_instance(name), "load")
 
     def pop(self) -> None:
-        """
-        Pop the current scene off the stack and return to the previous one.
-
-        This will trigger the `unload` hook of the current scene, remove it
-        from the stack, and then trigger the `load` hook of the scene beneath it.
-        Does nothing if the stack is empty.
-        """
+        """Remove the top scene and resume the one beneath it."""
         if not self._stack:
             return
-
-        current_name = self._stack.pop()
-        if current_name in self._instances:
-            self._dispatch(self._instances[current_name], "unload")
-
+        current = self._stack.pop()
+        self._dispatch(self._instances.get(current), "unload")
         if self._stack:
-            prev_name = self._stack[-1]
-            if prev_name in self._instances:
-                self._dispatch(self._instances[prev_name], "load")
+            self._dispatch(self._get_instance(self._stack[-1]), "resume")
 
     def switch(self, name: str) -> None:
-        """
-        Replace the current scene with a new one.
+        """Replace the current top-of-stack scene with a new one."""
+        if not self._stack:
+            self.push(name)
+            return
+        current = self._stack.pop()
+        self._dispatch(self._instances.get(current), "unload")
+        self._stack.append(name)
+        self._dispatch(self._get_instance(name), "load")
 
-        This effectively calls `pop()` followed by `push()`, maintaining the
-        same stack depth.
-
-        Args:
-            name (str): The name of the new scene to switch to.
-        """
-        if self._stack:
+    def pop_all(self) -> None:
+        """Clear the entire scene stack."""
+        while self._stack:
             self.pop()
-        self.push(name)
+
+    # ── Per-frame forwarding ──────────────────
+
+    def update(self, dt: float) -> None:
+        """Forward update to the active scene. Call from your game loop."""
+        inst = self.current
+        if inst:
+            self._dispatch(inst, "update", dt)
+
+    def draw(self, surface: Any) -> None:
+        """Forward draw to the active scene. Call from your game loop."""
+        inst = self.current
+        if inst:
+            self._dispatch(inst, "draw", surface)
+
+    # ── Instance helpers ─────────────────────
+
+    def _get_instance(self, name: str) -> Any:
+        if name not in self._instances:
+            self._instances[name] = self._scenes[name]()
+        return self._instances[name]
+
+    def destroy_instance(self, name: str) -> None:
+        """Destroy the cached instance so the scene is re-instantiated next time."""
+        self._instances.pop(name, None)
 
     @property
-    def current(self) -> Any:
-        """
-        Get the currently active scene instance.
-
-        Returns:
-            Any: The instance of the scene currently at the top of the stack,
-                 or None if the stack is empty.
-        """
+    def current(self) -> Optional[Any]:
+        """The scene instance at the top of the stack, or None."""
         if not self._stack:
             return None
         return self._instances.get(self._stack[-1])
 
-    def _dispatch(self, instance: Any, hook_name: str) -> None:
-        """
-        Find and call a decorated hook method on an instance.
+    @property
+    def current_name(self) -> Optional[str]:
+        return self._stack[-1] if self._stack else None
 
-        Args:
-            instance (Any): The scene instance to inspect.
-            hook_name (str): The type of hook to look for ("load" or "unload").
-        """
+    @property
+    def stack_names(self) -> List[str]:
+        return list(self._stack)
+
+    # ── Dispatch ─────────────────────────────
+
+    def _dispatch(self, instance: Any, hook_name: str, *args: Any) -> None:
+        if instance is None:
+            return
         for attr_name in dir(instance):
             if attr_name.startswith("__"):
                 continue
             try:
                 attr = getattr(instance, attr_name)
                 if getattr(attr, "_pyunix_scene", None) == hook_name:
-                    attr()
+                    attr(*args)
             except AttributeError:
                 pass
 
 
+# ---------------------------------------------------------------------------
+# Public facade
+# ---------------------------------------------------------------------------
+
 class _SceneAPI:
     """
-    A unified facade allowing `Scene` to be used both as a class decorator
-    and as a namespace for scene management methods.
+    Unified Scene API:
+    - `@Scene("name")` — registers a class as a scene
+    - `@Scene.load` / `@Scene.unload` — lifecycle hooks
+    - `@Scene.update` / `@Scene.draw` — per-frame hooks
+    - `Scene.push/pop/switch` — stack operations
+    - `Scene.update(dt)` / `Scene.draw(surface)` — loop forwarding
     """
 
     def __init__(self, manager: SceneManager) -> None:
-        """
-        Initialize the SceneAPI facade.
-
-        Args:
-            manager (SceneManager): The underlying scene manager instance.
-        """
         self._manager = manager
 
     def __call__(self, name: str) -> Callable:
-        """
-        Enable using `@Scene("name")` to register a class.
-
-        Args:
-            name (str): The name to register the scene under.
-
-        Returns:
-            Callable: The class decorator.
-        """
+        """Use as `@Scene("name")` to register a scene class."""
         return self._manager.register(name)
 
+    # Hook decorators (accessed as `Scene.load`, `Scene.draw`, etc.)
     @property
     def load(self) -> Callable:
-        """
-        Access the load hook decorator (`@Scene.load`).
-
-        Returns:
-            Callable: The load hook decorator.
-        """
         return self._manager.load_hook
 
     @property
     def unload(self) -> Callable:
-        """
-        Access the unload hook decorator (`@Scene.unload`).
-
-        Returns:
-            Callable: The unload hook decorator.
-        """
         return self._manager.unload_hook
 
-    def push(self, name: str) -> None:
-        """
-        Push a scene onto the stack.
+    @property
+    def update_hook(self) -> Callable:
+        return self._manager.update_hook
 
-        Args:
-            name (str): The name of the scene to push.
-        """
+    @property
+    def draw_hook(self) -> Callable:
+        return self._manager.draw_hook
+
+    @property
+    def pause(self) -> Callable:
+        return self._manager.pause_hook
+
+    @property
+    def resume(self) -> Callable:
+        return self._manager.resume_hook
+
+    # Stack operations
+    def push(self, name: str) -> None:
         self._manager.push(name)
 
     def pop(self) -> None:
-        """Pop the current scene off the stack."""
         self._manager.pop()
 
     def switch(self, name: str) -> None:
-        """
-        Replace the current scene with a new one.
-
-        Args:
-            name (str): The name of the scene to switch to.
-        """
         self._manager.switch(name)
 
-    @property
-    def current(self) -> Any:
-        """
-        Get the currently active scene instance.
+    def pop_all(self) -> None:
+        self._manager.pop_all()
 
-        Returns:
-            Any: The active scene instance or None.
-        """
+    def destroy_instance(self, name: str) -> None:
+        self._manager.destroy_instance(name)
+
+    # Per-frame forwarding
+    def update(self, dt: float) -> None:
+        self._manager.update(dt)
+
+    def draw(self, surface: Any) -> None:
+        self._manager.draw(surface)
+
+    # Properties
+    @property
+    def current(self) -> Optional[Any]:
         return self._manager.current
 
+    @property
+    def current_name(self) -> Optional[str]:
+        return self._manager.current_name
 
-# Global singleton
-# Hack to allow both Scene("name") and Scene.load decorators
+    @property
+    def stack(self) -> List[str]:
+        return self._manager.stack_names
+
+
 _manager = SceneManager()
 Scene = _SceneAPI(_manager)

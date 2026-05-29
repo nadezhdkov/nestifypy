@@ -1,285 +1,279 @@
 """
 nestifypy.collections.hash_map
----------------------------
-A fluent wrapper around Python's dictionary.
+--------------------------------
+A fluent wrapper around Python's ``dict`` with functional programming
+utilities and :class:`~nestifypy.collections.stream.Stream` interoperability.
 
-This module provides a `HashMap` class that encapsulates a standard Python dictionary
-while offering a fluent interface (method chaining) and utility methods commonly
-found in other programming languages like Java or Kotlin.
+Example::
+
+    from nestifypy.collections import HashMap
+
+    scores = (
+        HashMap({"alice": 80, "bob": 95, "carol": 70})
+        .put("dave", 88)
+        .filter_values(lambda v: v >= 80)
+        .map_values(lambda v: f"{v}%")
+    )
+    # HashMap({'alice': '80%', 'bob': '95%', 'dave': '88%'})
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Generic, Iterable, Iterator, List, Optional, Tuple, TypeVar
+import functools
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+    TYPE_CHECKING,
+)
 
 K = TypeVar("K")
 V = TypeVar("V")
 U = TypeVar("U")
+R = TypeVar("R")
+
 
 class HashMap(Generic[K, V]):
     """
-    A fluent wrapper around Python's dict.
-
-    Provides an object-oriented, chainable API for dictionary manipulation.
+    A fluent ``dict`` wrapper with functional transformations and chaining.
     """
 
-    def __init__(self, initial_data: Optional[Dict[K, V]] = None) -> None:
-        """
-        Initialize a new HashMap.
+    __slots__ = ("_data",)
 
-        Args:
-            initial_data (Optional[Dict[K, V]]): A dictionary to initialize the
-                map with. If None, an empty map is created. Defaults to None.
-        """
+    def __init__(self, initial_data: Optional[Dict[K, V]] = None) -> None:
         self._data: Dict[K, V] = initial_data.copy() if initial_data is not None else {}
 
-    def put(self, key: K, value: V) -> HashMap[K, V]:
-        """
-        Add or update a key-value pair in the map.
+    # ------------------------------------------------------------------
+    # Factories
+    # ------------------------------------------------------------------
 
-        Args:
-            key (K): The key to insert or update.
-            value (V): The value associated with the key.
+    @classmethod
+    def of(cls, **kwargs: V) -> "HashMap[str, V]":
+        """Create a HashMap from keyword arguments (keys become strings)."""
+        return cls(kwargs)  # type: ignore[arg-type]
 
-        Returns:
-            HashMap[K, V]: The current HashMap instance to allow method chaining.
-        """
+    @classmethod
+    def from_entries(cls, entries: Iterable[Tuple[K, V]]) -> "HashMap[K, V]":
+        """Create a HashMap from an iterable of (key, value) tuples."""
+        return cls(dict(entries))
+
+    @classmethod
+    def empty(cls) -> "HashMap[K, V]":
+        return cls()
+
+    # ------------------------------------------------------------------
+    # Mutation
+    # ------------------------------------------------------------------
+
+    def put(self, key: K, value: V) -> "HashMap[K, V]":
+        """Add or update a key-value pair."""
         self._data[key] = value
         return self
 
-    def get(self, key: K) -> Optional[V]:
-        """
-        Get the value for a given key.
+    def put_if_absent(self, key: K, value: V) -> "HashMap[K, V]":
+        """Add *key* → *value* only if *key* is not already present."""
+        self._data.setdefault(key, value)
+        return self
 
-        Args:
-            key (K): The key to look up.
+    def put_all(self, other: "Dict[K, V] | HashMap[K, V]") -> "HashMap[K, V]":
+        """Merge all entries from *other* into this map (last-write-wins)."""
+        if isinstance(other, HashMap):
+            self._data.update(other._data)
+        else:
+            self._data.update(other)
+        return self
 
-        Returns:
-            Optional[V]: The value associated with the key, or None if the key is not found.
-        """
-        return self._data.get(key)
-
-    def get_or_default(self, key: K, default: V) -> V:
-        """
-        Get the value for a key, or a default value if the key does not exist.
-
-        Args:
-            key (K): The key to look up.
-            default (V): The value to return if the key is missing.
-
-        Returns:
-            V: The found value, or the provided default.
-        """
-        return self._data.get(key, default)
-
-    def remove(self, key: K) -> HashMap[K, V]:
-        """
-        Remove a key and its associated value from the map.
-
-        Args:
-            key (K): The key to remove.
-
-        Returns:
-            HashMap[K, V]: The current HashMap instance to allow method chaining.
-        """
+    def remove(self, key: K) -> "HashMap[K, V]":
+        """Remove *key* from the map; no-op if not present."""
         self._data.pop(key, None)
         return self
 
-    def contains_key(self, key: K) -> bool:
-        """
-        Check if the map contains the specified key.
+    def remove_if(self, predicate: Callable[[K, V], bool]) -> "HashMap[K, V]":
+        """Remove all entries for which *predicate(key, value)* is True."""
+        self._data = {k: v for k, v in self._data.items() if not predicate(k, v)}
+        return self
 
-        Args:
-            key (K): The key to check for.
-
-        Returns:
-            bool: True if the key exists, False otherwise.
-        """
-        return key in self._data
-
-    def contains_value(self, value: V) -> bool:
-        """
-        Check if the map contains the specified value.
-
-        Args:
-            value (V): The value to check for.
-
-        Returns:
-            bool: True if the value exists in the map, False otherwise.
-        """
-        return value in self._data.values()
-
-    def is_empty(self) -> bool:
-        """
-        Check if the map contains no key-value pairs.
-
-        Returns:
-            bool: True if the map is empty, False otherwise.
-        """
-        return len(self._data) == 0
-
-    def size(self) -> int:
-        """
-        Get the total number of key-value pairs in the map.
-
-        Returns:
-            int: The size of the map.
-        """
-        return len(self._data)
-
-    def clear(self) -> HashMap[K, V]:
-        """
-        Remove all key-value pairs from the map.
-
-        Returns:
-            HashMap[K, V]: The current HashMap instance to allow method chaining.
-        """
+    def clear(self) -> "HashMap[K, V]":
         self._data.clear()
         return self
 
-    def keys(self) -> List[K]:
-        """
-        Retrieve all keys in the map.
+    # ------------------------------------------------------------------
+    # Inspection
+    # ------------------------------------------------------------------
 
-        Returns:
-            List[K]: A list containing all the keys.
-        """
+    def get(self, key: K) -> Optional[V]:
+        """Return the value for *key*, or ``None`` if not found."""
+        return self._data.get(key)
+
+    def get_or(self, key: K, default: V) -> V:
+        """Return the value for *key*, or *default* if not found."""
+        return self._data.get(key, default)
+
+    def get_or_else(self, key: K, supplier: Callable[[], V]) -> V:
+        """Return the value for *key*, or call *supplier* lazily."""
+        return self._data[key] if key in self._data else supplier()
+
+    def get_or_put(self, key: K, supplier: Callable[[], V]) -> V:
+        """Return the value for *key*; if absent, insert and return *supplier()*."""
+        if key not in self._data:
+            self._data[key] = supplier()
+        return self._data[key]
+
+    def contains_key(self, key: K) -> bool:
+        return key in self._data
+
+    def contains_value(self, value: V) -> bool:
+        return value in self._data.values()
+
+    def is_empty(self) -> bool:
+        return not self._data
+
+    def size(self) -> int:
+        return len(self._data)
+
+    # ------------------------------------------------------------------
+    # Bulk retrieval
+    # ------------------------------------------------------------------
+
+    def keys(self) -> List[K]:
         return list(self._data.keys())
 
     def values(self) -> List[V]:
-        """
-        Retrieve all values in the map.
-
-        Returns:
-            List[V]: A list containing all the values.
-        """
         return list(self._data.values())
 
     def entries(self) -> List[Tuple[K, V]]:
-        """
-        Retrieve all key-value pairs in the map.
-
-        Returns:
-            List[Tuple[K, V]]: A list of tuples, where each tuple is a (key, value) pair.
-        """
         return list(self._data.items())
 
-    def merge(self, other: Dict[K, V] | HashMap[K, V]) -> HashMap[K, V]:
-        """
-        Merge another dictionary or HashMap into a new HashMap.
+    # ------------------------------------------------------------------
+    # Transformation — new instances
+    # ------------------------------------------------------------------
 
-        Note that this does not mutate the current HashMap, but returns a new one.
-
-        Args:
-            other (Dict[K, V] | HashMap[K, V]): The mapping object to merge from.
-
-        Returns:
-            HashMap[K, V]: A new HashMap containing the merged data.
-        """
-        result = HashMap(self._data)
-        if isinstance(other, HashMap):
-            result._data.update(other._data)
-        else:
-            result._data.update(other)
-        return result
-
-    def map_values(self, transform: Callable[[V], U]) -> HashMap[K, U]:
-        """
-        Create a new HashMap with the same keys, but with transformed values.
-
-        Args:
-            transform (Callable[[V], U]): A function that takes a value of type V
-                and returns a new value of type U.
-
-        Returns:
-            HashMap[K, U]: A new HashMap with the transformed values.
-        """
+    def map_values(self, transform: Callable[[V], U]) -> "HashMap[K, U]":
+        """Return a new HashMap with the same keys and transformed values."""
         return HashMap({k: transform(v) for k, v in self._data.items()})
 
-    def for_each(self, action: Callable[[K, V], None]) -> HashMap[K, V]:
-        """
-        Apply a given action (function) to each key-value pair in the map.
+    def map_keys(self, transform: Callable[[K], Any]) -> "HashMap[Any, V]":
+        """Return a new HashMap with transformed keys and the same values (last-write-wins on collision)."""
+        return HashMap({transform(k): v for k, v in self._data.items()})
 
-        Args:
-            action (Callable[[K, V], None]): A function to execute for each item.
-                It takes a key and a value as arguments.
+    def map_entries(self, transform: Callable[[K, V], Tuple[Any, Any]]) -> "HashMap[Any, Any]":
+        """Apply *transform(key, value) → (new_key, new_value)* to every entry."""
+        return HashMap(dict(transform(k, v) for k, v in self._data.items()))
 
-        Returns:
-            HashMap[K, V]: The current HashMap instance to allow method chaining.
-        """
+    def filter_keys(self, predicate: Callable[[K], bool]) -> "HashMap[K, V]":
+        """Return a new HashMap with only the entries whose key satisfies *predicate*."""
+        return HashMap({k: v for k, v in self._data.items() if predicate(k)})
+
+    def filter_values(self, predicate: Callable[[V], bool]) -> "HashMap[K, V]":
+        """Return a new HashMap with only the entries whose value satisfies *predicate*."""
+        return HashMap({k: v for k, v in self._data.items() if predicate(v)})
+
+    def filter_entries(self, predicate: Callable[[K, V], bool]) -> "HashMap[K, V]":
+        """Return a new HashMap keeping entries where *predicate(key, value)* is True."""
+        return HashMap({k: v for k, v in self._data.items() if predicate(k, v)})
+
+    def merge(self, other: "Dict[K, V] | HashMap[K, V]") -> "HashMap[K, V]":
+        """Return a **new** HashMap merging this and *other* (other wins on conflicts)."""
+        result = HashMap(self._data)
+        result.put_all(other)
+        return result
+
+    def group_values_by(self, key_fn: Callable[[V], Any]) -> "HashMap[Any, List[V]]":
+        """Group values by the result of *key_fn* applied to each value."""
+        groups: Dict[Any, List[V]] = {}
+        for v in self._data.values():
+            groups.setdefault(key_fn(v), []).append(v)
+        return HashMap(groups)
+
+    def invert(self) -> "HashMap[V, K]":
+        """Return a new HashMap with keys and values swapped (last-write-wins on collision)."""
+        return HashMap({v: k for k, v in self._data.items()})
+
+    def reduce_values(self, fn: Callable[[R, V], R], initial: R) -> R:
+        """Fold the map's values using *fn*."""
+        return functools.reduce(fn, self._data.values(), initial)
+
+    def for_each(self, action: Callable[[K, V], None]) -> "HashMap[K, V]":
+        """Execute *action(key, value)* for each entry; supports chaining."""
         for k, v in self._data.items():
             action(k, v)
         return self
 
-    def to_dict(self) -> Dict[K, V]:
-        """
-        Convert the HashMap back to a standard Python dictionary.
+    # ------------------------------------------------------------------
+    # Stream interop
+    # ------------------------------------------------------------------
 
-        Returns:
-            Dict[K, V]: A shallow copy of the underlying dictionary.
-        """
+    def stream_keys(self) -> "Stream[K]":
+        """Return a Stream over the map's keys."""
+        from nestifypy.collections.stream import Stream
+        return Stream(list(self._data.keys()))
+
+    def stream_values(self) -> "Stream[V]":
+        """Return a Stream over the map's values."""
+        from nestifypy.collections.stream import Stream
+        return Stream(list(self._data.values()))
+
+    def stream_entries(self) -> "Stream[Tuple[K, V]]":
+        """Return a Stream over (key, value) tuples."""
+        from nestifypy.collections.stream import Stream
+        return Stream(list(self._data.items()))
+
+    # ------------------------------------------------------------------
+    # Conversion
+    # ------------------------------------------------------------------
+
+    def to_dict(self) -> Dict[K, V]:
         return dict(self._data)
 
-    def __iter__(self) -> Iterator[K]:
-        """
-        Iterate over the keys of the map.
+    # ------------------------------------------------------------------
+    # Operator overloads
+    # ------------------------------------------------------------------
 
-        Returns:
-            Iterator[K]: An iterator over the map's keys.
-        """
+    def __or__(self, other: "HashMap[K, V]") -> "HashMap[K, V]":
+        """Support ``map1 | map2`` (merge, other wins)."""
+        return self.merge(other)
+
+    def __ior__(self, other: "Dict[K, V] | HashMap[K, V]") -> "HashMap[K, V]":
+        """Support ``map |= other`` (in-place merge)."""
+        return self.put_all(other)
+
+    # ------------------------------------------------------------------
+    # Dunder helpers
+    # ------------------------------------------------------------------
+
+    def __iter__(self) -> Iterator[K]:
         return iter(self._data)
 
     def __len__(self) -> int:
-        """
-        Get the number of items in the map (allows `len(hash_map)`).
-
-        Returns:
-            int: The size of the map.
-        """
         return len(self._data)
 
     def __getitem__(self, key: K) -> V:
-        """
-        Get an item using square bracket notation (`hash_map[key]`).
-
-        Args:
-            key (K): The key to lookup.
-
-        Raises:
-            KeyError: If the key is not found in the map.
-
-        Returns:
-            V: The value associated with the key.
-        """
         return self._data[key]
 
     def __setitem__(self, key: K, value: V) -> None:
-        """
-        Set an item using square bracket notation (`hash_map[key] = value`).
-
-        Args:
-            key (K): The key to insert or update.
-            value (V): The value to store.
-        """
         self._data[key] = value
 
     def __contains__(self, key: Any) -> bool:
-        """
-        Check if a key is in the map (allows `key in hash_map`).
-
-        Args:
-            key (Any): The key to check for.
-
-        Returns:
-            bool: True if the key exists, False otherwise.
-        """
         return key in self._data
 
-    def __repr__(self) -> str:
-        """
-        Get the string representation of the HashMap.
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, HashMap):
+            return self._data == other._data
+        if isinstance(other, dict):
+            return self._data == other
+        return NotImplemented
 
-        Returns:
-            str: A string showing the class name and the underlying dictionary.
-        """
-        return f"HashMap({self._data})"
+    def __repr__(self) -> str:
+        return f"HashMap({self._data!r})"
+
+
+if TYPE_CHECKING:
+    from nestifypy.collections.stream import Stream

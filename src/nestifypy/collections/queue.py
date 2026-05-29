@@ -1,147 +1,148 @@
 """
 nestifypy.collections.queue
-------------------------
-A fluent FIFO queue implementation.
+----------------------------
+A fluent FIFO queue wrapping ``collections.deque``.
 
-This module provides a `Queue` class that wraps Python's highly optimized
-`collections.deque` to offer a First-In-First-Out (FIFO) data structure
-with a chainable, object-oriented API.
+Example::
+
+    from nestifypy.collections import Queue
+
+    front = Queue.of(1, 2, 3).enqueue(4).peek()  # 1
 """
 
 from __future__ import annotations
 
 import collections
-from typing import Any, Generic, Iterable, Iterator, Optional, TypeVar
+from typing import Any, Generic, Iterable, Iterator, List, Optional, TypeVar, TYPE_CHECKING
 
 T = TypeVar("T")
 
+
 class Queue(Generic[T]):
     """
-    A FIFO (First-In-First-Out) queue wrapping Python's collections.deque.
+    A First-In-First-Out (FIFO) queue with a fluent, chainable API.
 
-    Provides an easy-to-use interface for queue operations while allowing
-    method chaining for fluent data manipulation.
+    Backed by ``collections.deque`` for O(1) enqueue and dequeue at both ends.
     """
+
+    __slots__ = ("_data",)
 
     def __init__(self, items: Optional[Iterable[T]] = None) -> None:
         """
         Initialize a new Queue.
 
         Args:
-            items (Optional[Iterable[T]]): An iterable of elements to populate
-                the queue initially. The first element of the iterable becomes
-                the front of the queue. If None, an empty queue is created. Defaults to None.
+            items (Optional[Iterable[T]]): Seed elements. The first element
+                yielded becomes the front of the queue.
         """
-        self._data: collections.deque[T] = collections.deque(items if items is not None else [])
+        self._data: collections.deque[T] = collections.deque(
+            items if items is not None else []
+        )
 
-    def enqueue(self, item: T) -> Queue[T]:
-        """
-        Add an item to the back of the queue.
+    # ------------------------------------------------------------------
+    # Factories
+    # ------------------------------------------------------------------
 
-        Args:
-            item (T): The item to add to the queue.
+    @classmethod
+    def of(cls, *items: T) -> "Queue[T]":
+        """Create a Queue from positional arguments."""
+        return cls(items)
 
-        Returns:
-            Queue[T]: The current Queue instance to allow method chaining.
-        """
+    @classmethod
+    def empty(cls) -> "Queue[T]":
+        """Create an empty Queue."""
+        return cls()
+
+    # ------------------------------------------------------------------
+    # Core operations
+    # ------------------------------------------------------------------
+
+    def enqueue(self, item: T) -> "Queue[T]":
+        """Add *item* to the back of the queue (O(1))."""
         self._data.append(item)
+        return self
+
+    def enqueue_all(self, items: Iterable[T]) -> "Queue[T]":
+        """Add all *items* to the back in iteration order."""
+        self._data.extend(items)
         return self
 
     def dequeue(self) -> T:
         """
-        Remove and return the item at the front of the queue.
+        Remove and return the front element (O(1)).
 
         Raises:
-            IndexError: If the queue is empty when dequeue is called.
-
-        Returns:
-            T: The item that was at the front of the queue.
+            IndexError: If the queue is empty.
         """
         if not self._data:
             raise IndexError("dequeue from empty Queue")
         return self._data.popleft()
 
-    def peek(self) -> Optional[T]:
-        """
-        Return the item at the front of the queue without removing it.
+    def dequeue_or(self, default: T) -> T:
+        """Remove and return the front element, or *default* if empty."""
+        return self._data.popleft() if self._data else default
 
-        Returns:
-            Optional[T]: The item at the front of the queue, or None if the queue is empty.
-        """
+    def peek(self) -> Optional[T]:
+        """Return the front element without removing it, or ``None`` if empty."""
         return self._data[0] if self._data else None
 
-    def is_empty(self) -> bool:
-        """
-        Check if the queue has no items.
+    def peek_last(self) -> Optional[T]:
+        """Return the back element without removing it, or ``None`` if empty."""
+        return self._data[-1] if self._data else None
 
-        Returns:
-            bool: True if the queue is empty, False otherwise.
-        """
-        return len(self._data) == 0
-
-    def size(self) -> int:
-        """
-        Get the total number of items currently in the queue.
-
-        Returns:
-            int: The size of the queue.
-        """
-        return len(self._data)
-
-    def clear(self) -> Queue[T]:
-        """
-        Remove all items from the queue.
-
-        Returns:
-            Queue[T]: The current Queue instance to allow method chaining.
-        """
+    def clear(self) -> "Queue[T]":
+        """Remove all elements."""
         self._data.clear()
         return self
 
-    def to_list(self) -> list[T]:
-        """
-        Convert the queue into a standard list.
+    # ------------------------------------------------------------------
+    # Inspection
+    # ------------------------------------------------------------------
 
-        Returns:
-            list[T]: A copy of the underlying items, ordered from front to back.
-        """
+    def is_empty(self) -> bool:
+        return not self._data
+
+    def size(self) -> int:
+        return len(self._data)
+
+    # ------------------------------------------------------------------
+    # Stream interop
+    # ------------------------------------------------------------------
+
+    def stream(self) -> "Stream[T]":
+        """Return a :class:`~nestifypy.collections.stream.Stream` (front-to-back order)."""
+        from nestifypy.collections.stream import Stream
+        return Stream(list(self._data))
+
+    # ------------------------------------------------------------------
+    # Conversion
+    # ------------------------------------------------------------------
+
+    def to_list(self) -> List[T]:
+        """Return a copy ordered from front to back."""
         return list(self._data)
 
-    def __iter__(self) -> Iterator[T]:
-        """
-        Iterate over the items in the queue from front to back.
+    # ------------------------------------------------------------------
+    # Dunder helpers
+    # ------------------------------------------------------------------
 
-        Returns:
-            Iterator[T]: An iterator over the queue's elements.
-        """
+    def __iter__(self) -> Iterator[T]:
         return iter(self._data)
 
     def __len__(self) -> int:
-        """
-        Get the number of items in the queue (allows `len(queue)`).
-
-        Returns:
-            int: The size of the queue.
-        """
         return len(self._data)
 
     def __contains__(self, item: Any) -> bool:
-        """
-        Check if an item is in the queue (allows `item in queue`).
-
-        Args:
-            item (Any): The item to check for.
-
-        Returns:
-            bool: True if the item exists in the queue, False otherwise.
-        """
         return item in self._data
 
-    def __repr__(self) -> str:
-        """
-        Get the string representation of the Queue.
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Queue):
+            return list(self._data) == list(other._data)
+        return NotImplemented
 
-        Returns:
-            str: A string showing the class name and its elements from front to back.
-        """
-        return f"Queue({list(self._data)})"
+    def __repr__(self) -> str:
+        return f"Queue({list(self._data)!r})"
+
+
+if TYPE_CHECKING:
+    from nestifypy.collections.stream import Stream

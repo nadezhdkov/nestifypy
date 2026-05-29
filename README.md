@@ -1,72 +1,72 @@
-<div align="center">
-  <h1>🪺 Nestifypy Framework</h1>
-  <p><strong>A Modern, Declarative Utility and Game Framework for Python 3.10+</strong></p>
+# 🪺 Nestifypy Framework
 
-  <p>
-    <a href="https://github.com/nestifypy/nestifypy/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" alt="Build Status"></a>
-    <a href="https://pypi.org/project/nestifypy/"><img src="https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square&logo=python&logoColor=white" alt="Python Version"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
-    <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
-    <a href="SECURITY.md"><img src="https://img.shields.io/badge/security-policy-lightgrey?style=flat-square" alt="Security"></a>
-  </p>
-</div>
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/nestifypy/nestifypy/actions)
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square&logo=python&logoColor=white)](https://pypi.org/project/nestifypy/)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Security Policy](https://img.shields.io/badge/security-policy-lightgrey?style=flat-square)](SECURITY.md)
 
----
-
-**Nestifypy** is a production-ready, modular utility and game framework for Python. It provides a highly declarative, decorator-driven approach to application development, focusing on performance, developer ergonomics, and strict type safety.
+**Nestifypy** is a modern, declarative utility and game framework for Python 3.10+. It provides a highly declarative, decorator-driven approach to application development, focusing on performance, developer ergonomics, and strict type safety.
 
 Whether you are building complex CLI tools, managing intelligent configuration registries, or developing 2D physics-based games, Nestifypy provides a robust foundation.
 
-## 🚀 Key Features
+## 📖 The Nestifypy Ecosystem
 
-### 🎮 Pyunix Game Engine (`nestifypy.pyunix`)
-A fully declarative, decorator-driven engine built on top of `pygame`. 
-- **No Boilerplate:** Build games using `@Game`, `@Sprite`, and `@Scene` without writing messy `while True` game loops.
-- **ECS-Friendly Architecture:** Build isolated entities and manage them easily via `SpriteGroup`.
-- **Built-in 2D Physics:** High-performance Rigidbody physics with spatial hashing, `BoxCollider` / `CircleCollider`, and collision event hooks (`@Sprite.on_collision_enter`).
-- **Declarative UI & Fonts:** Advanced text rendering system with outlines, shadows, anchors, and caching via the `@Game.text` decorator.
-- **Advanced Systems:** Built-in `Camera` with smooth-follow and screenshake, flexible `Audio` management, and robust `Timer` logic tied to game Delta-Time.
+Nestifypy is a modular framework composed of several distinct, high-performance packages:
 
-### 🛠️ Core Utilities
-- **Intelligent YAML Registry (`nestifypy.yaml`)**: An advanced configuration engine that automatically scans, caches, and indexes your YAML files, providing instant `O(1)` access via dot-notation (e.g., `yaml.get("server.port")`).
-- **Declarative Environments (`nestifypy.env`)**: Bind `.env` variables directly to class properties using the `EnvProperty` descriptor, or inject them into functions using `@Env.inject`.
-- **System Tools (`nestifypy.os`)**: Cross-platform, memory-efficient generators for file scanning, subprocess management, and directory operations.
-- **CLI Ecosystem (`nestifypy cli`)**: Scaffolding tools to generate professional-grade projects instantly with built-in support for `ruff`, `pytest`, and `mypy`.
-
----
+1. **Komodo (`nestifypy.komodo`)**: Lombok-style annotation-driven metaprogramming. Eliminates Python boilerplate using decorators like `@komodo.data`, `@komodo.builder`, and provides robust Design-by-Contract constraints (`@contract`).
+2. **Ignite (`nestifypy.ignite`)**: A Spring Boot-inspired enterprise application framework featuring advanced Dependency Injection, a robust Event Bus, and auto-configuration.
+3. **Pyunix Game Engine (`nestifypy.pyunix`)**: A fully declarative, decorator-driven 2D game engine built on top of `pygame`, featuring built-in physics (Rigidbodies, Colliders), ECS-friendly architecture, and declarative UI.
+4. **Core Utilities**: A suite of tools for intelligent configuration (YAML), declarative environment variable binding, cross-platform OS tasks, and CLI project scaffolding.
 
 ## 📦 Installation
 
 Nestifypy requires **Python 3.10 or higher**.
 
-To install the core utility framework (without Pygame dependencies):
+**Core Framework Only (No Pygame dependencies):**
 ```bash
 pip install nestifypy
 ```
 
-To install Nestifypy with **full Pyunix Game Framework** capabilities:
+**Full Framework (Includes Pyunix Game Engine):**
 ```bash
 pip install "nestifypy[game]"
 ```
 
----
+## 🚀 Usage Guide
 
-## ⚡ Quick Start
+### 1. Initializing a Project
 
-### 1. Initialize a Project
-Use the CLI to scaffold a new project complete with a professional `pyproject.toml` and directory structure.
+Nestifypy comes with a CLI to scaffold a professional-grade project structure instantly:
 ```bash
 nestifypy init --name my_app
 ```
 
-### 2. Building a Game (Pyunix)
-Building a game loop is as simple as decorating a class. 
+### 2. Smart Configuration & Environment
+
+Access parsed configurations instantly across your entire project.
+
+```python
+from nestifypy import yaml
+from nestifypy.env import Env
+
+# Automatically load .env file
+Env.load()
+api_key = Env.required("API_KEY")
+
+# Fetch values natively from any scanned .yml file using dot-notation
+db_host = yaml.get("database.host") 
+```
+
+### 3. Building a Game (Pyunix)
+
+Building a game loop is as simple as decorating a class. No messy `while True` loops.
 
 ```python
 from nestifypy.pyunix import Game, Entity, Rigidbody, BoxCollider, BodyType
 from nestifypy.types import Vector2, Color
 
-# 1. Define your Game
+# Define your Game using decorators
 @Game(title="My Awesome Game", size=(800, 600), fps=60)
 class MyGame:
     @Game.start
@@ -76,7 +76,7 @@ class MyGame:
 
     @Game.update
     def update(self, dt: float):
-        # Game logic here
+        # Frame-by-frame game logic here
         pass
 
     @Game.draw
@@ -85,9 +85,9 @@ class MyGame:
 
     @Game.text(x=10, y=10, size=24, color="white", outline=True)
     def score_ui(self):
-        return f"SCORE: 1000"
+        return "SCORE: 1000"
 
-# 2. Define your Entities with Physics
+# Define your Entities with Physics
 class Player(Entity):
     def __init__(self, x, y):
         super().__init__(
@@ -97,70 +97,91 @@ class Player(Entity):
             collider=BoxCollider(width=32, height=32)
         )
 
-    @Sprite.update
+    @Entity.update
     def movement(self, dt):
         if self.input.is_action_pressed("jump"):
             self.rigidbody.add_impulse(Vector2(0, -500))
 
-# 3. Run!
 if __name__ == "__main__":
     game = MyGame()
     game.run()
 ```
 
-### 3. Smart Configuration & Env
-Access parsed configurations instantly across your entire project.
+### 4. Metaprogramming with Komodo
+
+Eliminate class boilerplate and enforce runtime contracts instantly.
 
 ```python
-from nestifypy import yaml
-from nestifypy.env import Env
+from nestifypy.komodo import komodo, contract, requires
 
-# Automatically loads .env file
-Env.load()
-api_key = Env.required("API_KEY")
+@komodo.builder
+@komodo.data
+class DatabaseConfig:
+    host: str
+    port: int = 5432
+    
+@contract(requires(lambda config: config.port > 1024, "Port must be > 1024"))
+def connect(config: DatabaseConfig):
+    print(f"Connecting to {config.host}:{config.port}")
 
-# Fetches value from any scanned .yml file in the project natively
-db_host = yaml.get("database.host") 
+# Using the generated Builder
+conf = DatabaseConfig.Builder().with_host("localhost").build()
+connect(conf)
 ```
 
----
+### 5. Enterprise Apps with Ignite
+
+Build Spring Boot-style applications with Auto-Configuration and Dependency Injection.
+
+```python
+from nestifypy.ignite import Application
+from nestifypy.ignite.decorators import Component, Autowired
+
+@Component
+class EmailService:
+    def send(self, msg: str):
+        print(f"Sending: {msg}")
+
+@Component
+class UserService:
+    email_service: EmailService = Autowired()
+
+    def register(self, user: str):
+        self.email_service.send(f"Welcome {user}!")
+
+if __name__ == "__main__":
+    app = Application.run()
+    app.context.get_bean(UserService).register("Alice")
+```
+
+## ✨ Features
+
+- **Komodo Metaprogramming:** `@komodo.data`, `@komodo.builder`, `@komodo.singleton`, and `@contract` constraints for clean, boilerplate-free data structures.
+- **Ignite Framework:** Spring Boot-inspired IoC container, Dependency Injection, and Lifecycle hooks (`@PostConstruct`).
+- **No Boilerplate Game Loops:** Build Pyunix games using `@Game`, `@Entity`, and `@Scene`.
+- **Built-in 2D Physics:** High-performance Rigidbody physics, spatial hashing, `BoxCollider` / `CircleCollider`, and collision hooks.
+- **Intelligent YAML Registry:** Caches and indexes YAML files for `O(1)` dot-notation access.
+- **Declarative Environments:** Bind `.env` variables directly to class properties.
+- **CLI Scaffolding:** Generate robust projects with built-in support for `ruff`, `pytest`, and `mypy`.
 
 ## 📚 Documentation
 
-Detailed guides and API references for each module can be found in the `docs/` directory:
+For detailed guides, please check the `docs/` directory in our GitHub repository:
+- 🦎 [Komodo Metaprogramming](https://github.com/nestifypy/nestifypy/tree/main/docs/komodo.md)
+- 🎮 [Pyunix Game Framework](https://github.com/nestifypy/nestifypy/tree/main/docs/pyunix.md)
+- ⚙️ [YAML Intelligent Registry](https://github.com/nestifypy/nestifypy/tree/main/docs/yaml.md)
+- 🔒 [Environment Management](https://github.com/nestifypy/nestifypy/tree/main/docs/env.md)
+- 📁 [OS & File Utilities](https://github.com/nestifypy/nestifypy/tree/main/docs/os.md)
 
-- 🎮 **[Pyunix Game Framework](docs/pyunix.md)** (Includes Physics & UI guides)
-- ⚙️ **[YAML Intelligent Registry](docs/yaml.md)**
-- 🔒 **[Environment Management](docs/env.md)**
-- 📁 **[OS & File Utilities](docs/os.md)**
-- 📝 **[JSON Tools](docs/json.md)**
-- 🖥️ **[Console Tools](docs/console.md)**
-- 🧱 **[Core Systems (Logger/Plugins)](docs/core.md)**
-- ✨ **[Decorators](docs/decorators.md)**
-- ⏱️ **[Control Flow](docs/flow.md)**
-- 🗃️ **[Collections](docs/collections.md)**
-
----
+*(Note: Documentation links assume you are browsing on GitHub. More modules available in the repository.)*
 
 ## 🤝 Contributing
 
-Nestifypy is built with modern Python tools (`uv`, `ruff`, `pytest`). We welcome contributions!
-
+We welcome contributions! Please review our repository if you are interested in helping out.
 1. Clone the repository.
-2. Install development dependencies using `uv` or `pip`:
-   ```bash
-   uv pip install -e ".[dev]"
-   ```
-3. Run tests:
-   ```bash
-   pytest
-   ```
-4. Lint code:
-   ```bash
-   ruff check .
-   ```
-
----
+2. Install development dependencies using `uv` or `pip`: `uv pip install -e ".[dev]"`
+3. Run tests: `pytest`
+4. Lint code: `ruff check .`
 
 ## 🛡️ Security
 

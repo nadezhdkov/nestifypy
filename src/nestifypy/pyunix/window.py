@@ -1,19 +1,15 @@
 """
 nestifypy.pyunix.window
---------------------
-Window creation and management wrapper.
-
-This module encapsulates Pygame's display initialization and window management
-capabilities into a clean, object-oriented API. It provides a global `Window`
-singleton to easily manage screen resolution, flags, and icons.
+-----------------------
+Window creation, management, and display utilities.
 """
-
 from __future__ import annotations
 
 import os
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 from nestifypy.pyunix.exceptions import WindowError
+from nestifypy.pyunix.math import Color
 
 try:
     import pygame
@@ -23,18 +19,14 @@ except ImportError:
 
 
 class WindowSystem:
-    """
-    Manages the Pygame display surface and window properties.
-
-    Provides methods to initialize the display, toggle fullscreen, set window
-    icons, and retrieve dimensional information.
-    """
+    """Manages the pygame display surface and window properties."""
 
     def __init__(self) -> None:
-        """Initialize the WindowSystem with empty dimensions and surface."""
-        self.surface: Any = None
-        self.width = 0
-        self.height = 0
+        self.surface: Any       = None
+        self.width:   int       = 0
+        self.height:  int       = 0
+        self._title:  str       = ""
+        self._clear_color: Tuple[int, int, int] = (0, 0, 0)
 
     def create(
         self,
@@ -45,23 +37,17 @@ class WindowSystem:
         resizable: bool = False,
     ) -> Any:
         """
-        Initialize the Pygame display and create the main application window.
+        Initialize pygame and create the main window.
 
         Args:
-            title (str): The text to display in the window's title bar.
-            size (Tuple[int, int]): A tuple containing the (width, height) of the window in pixels.
-            fullscreen (bool): Whether to create the window in fullscreen mode. Defaults to False.
-            vsync (bool): Whether to enable vertical synchronization. Defaults to True.
-            resizable (bool): Whether the window should be resizable by the user. Defaults to False.
-
-        Raises:
-            WindowError: If Pygame is not installed in the environment.
-
-        Returns:
-            Any: The main Pygame display Surface.
+            title:      Window title bar text.
+            size:       (width, height) in pixels.
+            fullscreen: Start in fullscreen mode.
+            vsync:      Enable V-Sync (may be ignored on some platforms/drivers).
+            resizable:  Allow the user to resize the window.
         """
         if not _HAS_PYGAME:
-            raise WindowError("pygame is required to create a window")
+            raise WindowError("pygame is required to create a window.")
 
         if not pygame.get_init():
             pygame.init()
@@ -72,65 +58,87 @@ class WindowSystem:
         if resizable:
             flags |= pygame.RESIZABLE
 
-        # Some platforms/drivers don't support vsync flag well, fallback gracefully
         try:
             self.surface = pygame.display.set_mode(size, flags, vsync=int(vsync))
-        except pygame.error:
+        except (pygame.error, TypeError):
             self.surface = pygame.display.set_mode(size, flags)
 
         pygame.display.set_caption(title)
+        self._title = title
         self.width, self.height = size
-
         return self.surface
 
-    def center(self) -> None:
+    def clear(self, color: Any = None) -> None:
         """
-        Force the window to spawn in the center of the user's monitor.
+        Fill the window with `color` (or the configured clear color).
 
-        Note:
-            This method must be called **before** `Window.create()` to have any effect,
-            as it modifies OS-level environment variables used by SDL.
+        Call at the start of every draw method to erase the last frame.
         """
-        os.environ['SDL_VIDEO_CENTERED'] = '1'
+        if self.surface is None:
+            return
+        if color is None:
+            fill = self._clear_color
+        elif isinstance(color, Color):
+            fill = color.to_rgb()
+        else:
+            fill = color
+        self.surface.fill(fill)
+
+    def set_clear_color(self, color: Any) -> None:
+        """Set the background color used by Window.clear()."""
+        if isinstance(color, Color):
+            self._clear_color = color.to_rgb()
+        else:
+            self._clear_color = color
+
+    def set_title(self, title: str) -> None:
+        self._title = title
+        if _HAS_PYGAME:
+            pygame.display.set_caption(title)
 
     def set_icon(self, path: str) -> None:
-        """
-        Set the window's icon from an image file.
-
-        Args:
-            path (str): The file path to the image to use as the icon.
-
-        Raises:
-            WindowError: If the image fails to load (e.g., file not found or invalid format).
-        """
+        """Load an image file and use it as the window icon."""
         if not _HAS_PYGAME:
             return
         try:
             icon = pygame.image.load(path)
             pygame.display.set_icon(icon)
-        except Exception as e:
-            raise WindowError(f"Failed to load icon '{path}': {e}")
+        except Exception as exc:
+            raise WindowError(f"Failed to load icon '{path}': {exc}") from exc
+
+    def center(self) -> None:
+        """
+        Center the window on the monitor.
+        Must be called BEFORE create().
+        """
+        os.environ["SDL_VIDEO_CENTERED"] = "1"
 
     def toggle_fullscreen(self) -> None:
-        """
-        Toggle the window between windowed and fullscreen modes.
+        if _HAS_PYGAME and self.surface:
+            pygame.display.toggle_fullscreen()
 
-        Does nothing if Pygame is not installed or the window has not been created yet.
-        """
-        if not _HAS_PYGAME or not self.surface:
-            return
-        pygame.display.toggle_fullscreen()
+    def screenshot(self, path: str = "screenshot.png") -> None:
+        """Save the current frame to an image file."""
+        if _HAS_PYGAME and self.surface:
+            pygame.image.save(self.surface, path)
+
+    @property
+    def size(self) -> Tuple[int, int]:
+        return (self.width, self.height)
 
     @property
     def center_pos(self) -> Tuple[int, int]:
-        """
-        Get the exact center coordinates of the current window.
-
-        Returns:
-            Tuple[int, int]: The (x, y) coordinates representing the center of the screen.
-        """
         return (self.width // 2, self.height // 2)
 
+    @property
+    def rect(self) -> Any:
+        if _HAS_PYGAME:
+            return pygame.Rect(0, 0, self.width, self.height)
+        return None
 
-# Global singleton
+    @property
+    def title(self) -> str:
+        return self._title
+
+
 Window = WindowSystem()

@@ -1,183 +1,248 @@
 """
 nestifypy.collections.ordered_set
-------------------------------
-A fluent insertion-ordered set.
+-----------------------------------
+A fluent insertion-ordered set backed by Python's ``dict``.
 
-This module provides an `OrderedSet` class that guarantees the preservation of
-insertion order, leveraging the built-in dictionary ordering introduced in Python 3.7.
-It offers a fluent API for easy method chaining.
+Guarantees unique elements while preserving the order in which they
+were first added. Supports full set algebra (union, intersection,
+difference, symmetric difference) and Stream interoperability.
+
+Example::
+
+    from nestifypy.collections import OrderedSet
+
+    s = (
+        OrderedSet([3, 1, 4, 1, 5, 9, 2, 6])
+        .remove(4)
+        .filter(lambda x: x > 2)
+    )
+    # OrderedSet([3, 5, 9, 6])
 """
 
 from __future__ import annotations
 
-from typing import Any, Generic, Iterable, Iterator, Optional, TypeVar
+import functools
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+    TYPE_CHECKING,
+)
 
 T = TypeVar("T")
+U = TypeVar("U")
+K = TypeVar("K")
+R = TypeVar("R")
+
 
 class OrderedSet(Generic[T]):
     """
-    An insertion-ordered set based on Python's guaranteed dict ordering.
+    An insertion-ordered set with a fluent API and full set algebra support.
 
-    Provides a collection of unique elements that remembers the order in which
-    elements were added, while offering a chainable API.
+    All elements must be **hashable**.
     """
 
+    __slots__ = ("_data",)
+
     def __init__(self, items: Optional[Iterable[T]] = None) -> None:
-        """
-        Initialize a new OrderedSet.
+        self._data: Dict[T, None] = (
+            dict.fromkeys(items) if items is not None else {}
+        )
 
-        Args:
-            items (Optional[Iterable[T]]): An iterable of elements to populate
-                the set initially. If None, an empty set is created. Defaults to None.
-        """
-        # dict.fromkeys preserves insertion order (Python 3.7+)
-        self._data: dict[T, None] = dict.fromkeys(items) if items is not None else {}
+    # ------------------------------------------------------------------
+    # Factories
+    # ------------------------------------------------------------------
 
-    def add(self, item: T) -> OrderedSet[T]:
-        """
-        Add an item to the set.
+    @classmethod
+    def of(cls, *items: T) -> "OrderedSet[T]":
+        return cls(items)
 
-        If the item is already present, its position in the insertion order remains unchanged.
+    @classmethod
+    def empty(cls) -> "OrderedSet[T]":
+        return cls()
 
-        Args:
-            item (T): The item to add.
+    # ------------------------------------------------------------------
+    # Mutation
+    # ------------------------------------------------------------------
 
-        Returns:
-            OrderedSet[T]: The current OrderedSet instance to allow method chaining.
-        """
+    def add(self, item: T) -> "OrderedSet[T]":
+        """Add *item*; if already present its position is unchanged."""
         self._data[item] = None
         return self
 
-    def remove(self, item: T) -> OrderedSet[T]:
-        """
-        Remove an item from the set. Does nothing if the item is not found.
+    def add_all(self, items: Iterable[T]) -> "OrderedSet[T]":
+        """Add all *items*."""
+        for item in items:
+            self._data[item] = None
+        return self
 
-        Args:
-            item (T): The item to remove.
-
-        Returns:
-            OrderedSet[T]: The current OrderedSet instance to allow method chaining.
-        """
+    def remove(self, item: T) -> "OrderedSet[T]":
+        """Remove *item*; no-op if not present."""
         self._data.pop(item, None)
         return self
 
-    def contains(self, item: T) -> bool:
-        """
-        Check if the set contains a specific item.
+    def discard(self, item: T) -> "OrderedSet[T]":
+        """Alias for :meth:`remove`."""
+        return self.remove(item)
 
-        Args:
-            item (T): The item to check for.
-
-        Returns:
-            bool: True if the item exists in the set, False otherwise.
-        """
-        return item in self._data
-
-    def is_empty(self) -> bool:
-        """
-        Check if the set has no elements.
-
-        Returns:
-            bool: True if the set is empty, False otherwise.
-        """
-        return len(self._data) == 0
-
-    def size(self) -> int:
-        """
-        Get the total number of unique items in the set.
-
-        Returns:
-            int: The size of the set.
-        """
-        return len(self._data)
-
-    def clear(self) -> OrderedSet[T]:
-        """
-        Remove all items from the set.
-
-        Returns:
-            OrderedSet[T]: The current OrderedSet instance to allow method chaining.
-        """
+    def clear(self) -> "OrderedSet[T]":
         self._data.clear()
         return self
 
-    def union(self, other: Iterable[T]) -> OrderedSet[T]:
-        """
-        Create a new OrderedSet containing all elements from both this set and another iterable.
+    # ------------------------------------------------------------------
+    # Inspection
+    # ------------------------------------------------------------------
 
-        Elements from this set appear first, followed by new elements from `other`.
+    def contains(self, item: T) -> bool:
+        return item in self._data
 
-        Args:
-            other (Iterable[T]): The collection of elements to unite with this set.
+    def is_empty(self) -> bool:
+        return not self._data
 
-        Returns:
-            OrderedSet[T]: A new OrderedSet containing the union of both collections.
-        """
+    def size(self) -> int:
+        return len(self._data)
+
+    def count_by(self, predicate: Callable[[T], bool]) -> int:
+        return sum(1 for item in self._data if predicate(item))
+
+    # ------------------------------------------------------------------
+    # Set algebra — all return new instances
+    # ------------------------------------------------------------------
+
+    def union(self, other: Iterable[T]) -> "OrderedSet[T]":
+        """Return a new set containing all elements from both."""
         result = OrderedSet(self._data.keys())
         for item in other:
-            result.add(item)
+            result._data[item] = None
         return result
 
-    def intersection(self, other: Iterable[T]) -> OrderedSet[T]:
-        """
-        Create a new OrderedSet containing only the elements common to both collections.
+    def intersection(self, other: Iterable[T]) -> "OrderedSet[T]":
+        """Return a new set containing only elements present in both."""
+        other_set: Set[Any] = set(other)
+        return OrderedSet(item for item in self._data if item in other_set)
 
-        The insertion order of the resulting set matches the order of this set.
+    def difference(self, other: Iterable[T]) -> "OrderedSet[T]":
+        """Return a new set with elements from this set not in *other*."""
+        other_set: Set[Any] = set(other)
+        return OrderedSet(item for item in self._data if item not in other_set)
 
-        Args:
-            other (Iterable[T]): The collection of elements to intersect with.
+    def symmetric_difference(self, other: Iterable[T]) -> "OrderedSet[T]":
+        """Return a new set with elements in exactly one of the two sets."""
+        other_ordered = OrderedSet(other)
+        result: List[T] = [item for item in self._data if item not in other_ordered._data]
+        result += [item for item in other_ordered._data if item not in self._data]
+        return OrderedSet(result)
 
-        Returns:
-            OrderedSet[T]: A new OrderedSet containing the common elements.
-        """
-        other_set = set(other)
-        result = OrderedSet(item for item in self._data if item in other_set)
-        return result
+    def is_subset(self, other: Iterable[T]) -> bool:
+        """Return ``True`` if every element of this set is in *other*."""
+        other_set: Set[Any] = set(other)
+        return all(item in other_set for item in self._data)
 
-    def to_list(self) -> list[T]:
-        """
-        Convert the OrderedSet into a standard list.
+    def is_superset(self, other: Iterable[T]) -> bool:
+        """Return ``True`` if this set contains every element of *other*."""
+        return all(item in self._data for item in other)
 
-        Returns:
-            list[T]: A list of the set's items, preserving their insertion order.
-        """
+    def is_disjoint(self, other: Iterable[T]) -> bool:
+        """Return ``True`` if this set and *other* share no elements."""
+        other_set: Set[Any] = set(other)
+        return not any(item in other_set for item in self._data)
+
+    # ------------------------------------------------------------------
+    # Transformation — new instances
+    # ------------------------------------------------------------------
+
+    def map(self, transform: Callable[[T], U]) -> "OrderedSet[U]":
+        """Apply *transform* to each element; duplicates in the output are merged."""
+        return OrderedSet(transform(item) for item in self._data)
+
+    def filter(self, predicate: Callable[[T], bool]) -> "OrderedSet[T]":
+        """Return a new set containing only elements where *predicate* is True."""
+        return OrderedSet(item for item in self._data if predicate(item))
+
+    def reduce(self, fn: Callable[[R, T], R], initial: R) -> R:
+        return functools.reduce(fn, self._data.keys(), initial)
+
+    def sorted(self, *, key: Optional[Callable[[T], Any]] = None, reverse: bool = False) -> "OrderedSet[T]":
+        """Return a new OrderedSet with elements in sorted order."""
+        return OrderedSet(sorted(self._data.keys(), key=key, reverse=reverse))
+
+    def for_each(self, action: Callable[[T], None]) -> "OrderedSet[T]":
+        for item in self._data:
+            action(item)
+        return self
+
+    # ------------------------------------------------------------------
+    # Stream interop
+    # ------------------------------------------------------------------
+
+    def stream(self) -> "Stream[T]":
+        from nestifypy.collections.stream import Stream
+        return Stream(list(self._data.keys()))
+
+    # ------------------------------------------------------------------
+    # Conversion
+    # ------------------------------------------------------------------
+
+    def to_list(self) -> List[T]:
         return list(self._data.keys())
 
-    def __iter__(self) -> Iterator[T]:
-        """
-        Iterate over the elements of the set in insertion order.
+    def to_set(self) -> Set[T]:
+        return set(self._data.keys())
 
-        Returns:
-            Iterator[T]: An iterator over the set's elements.
-        """
+    # ------------------------------------------------------------------
+    # Operator overloads
+    # ------------------------------------------------------------------
+
+    def __or__(self, other: "OrderedSet[T]") -> "OrderedSet[T]":
+        return self.union(other)
+
+    def __and__(self, other: "OrderedSet[T]") -> "OrderedSet[T]":
+        return self.intersection(other)
+
+    def __sub__(self, other: "OrderedSet[T]") -> "OrderedSet[T]":
+        return self.difference(other)
+
+    def __xor__(self, other: "OrderedSet[T]") -> "OrderedSet[T]":
+        return self.symmetric_difference(other)
+
+    def __le__(self, other: "OrderedSet[T]") -> bool:
+        return self.is_subset(other)
+
+    def __ge__(self, other: "OrderedSet[T]") -> bool:
+        return self.is_superset(other)
+
+    # ------------------------------------------------------------------
+    # Dunder helpers
+    # ------------------------------------------------------------------
+
+    def __iter__(self) -> Iterator[T]:
         return iter(self._data.keys())
 
     def __len__(self) -> int:
-        """
-        Get the number of items in the set (allows `len(ordered_set)`).
-
-        Returns:
-            int: The size of the set.
-        """
         return len(self._data)
 
     def __contains__(self, item: Any) -> bool:
-        """
-        Check if an item is in the set (allows `item in ordered_set`).
-
-        Args:
-            item (Any): The item to check for.
-
-        Returns:
-            bool: True if the item exists, False otherwise.
-        """
         return item in self._data
 
-    def __repr__(self) -> str:
-        """
-        Get the string representation of the OrderedSet.
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, OrderedSet):
+            return list(self._data.keys()) == list(other._data.keys())
+        return NotImplemented
 
-        Returns:
-            str: A string showing the class name and its elements.
-        """
-        return f"OrderedSet({list(self._data.keys())})"
+    def __hash__(self) -> int:  # type: ignore[override]
+        return hash(tuple(self._data.keys()))
+
+    def __repr__(self) -> str:
+        return f"OrderedSet({list(self._data.keys())!r})"
+
+
+if TYPE_CHECKING:
+    from nestifypy.collections.stream import Stream

@@ -1,148 +1,142 @@
 """
 nestifypy.collections.stack
-------------------------
-A fluent LIFO stack implementation.
+----------------------------
+A fluent LIFO stack wrapping Python's ``list``.
 
-This module provides a `Stack` class that wraps Python's built-in `list`
-to offer a Last-In-First-Out (LIFO) data structure. It features an
-object-oriented API with support for method chaining.
+Example::
+
+    from nestifypy.collections import Stack
+
+    top = Stack.of(1, 2, 3).push(4).peek()  # 4
 """
 
 from __future__ import annotations
 
-from typing import Any, Generic, Iterable, Iterator, List, Optional, TypeVar
+from typing import Any, Generic, Iterable, Iterator, List, Optional, TypeVar, TYPE_CHECKING
 
 T = TypeVar("T")
 
+
 class Stack(Generic[T]):
     """
-    A LIFO (Last-In-First-Out) stack wrapping Python's list.
+    A Last-In-First-Out (LIFO) stack with a fluent, chainable API.
 
-    Provides standard stack operations (push, pop, peek) while allowing
-    method chaining for fluent data manipulation. The end of the underlying
-    list represents the top of the stack.
+    The end of the underlying list represents the top of the stack,
+    giving O(1) push/pop/peek.
     """
+
+    __slots__ = ("_data",)
 
     def __init__(self, items: Optional[Iterable[T]] = None) -> None:
         """
         Initialize a new Stack.
 
         Args:
-            items (Optional[Iterable[T]]): An iterable of elements to populate
-                the stack initially. The elements are pushed in iteration order,
-                so the last element yielded becomes the top of the stack.
-                If None, an empty stack is created. Defaults to None.
+            items (Optional[Iterable[T]]): Seed elements. The last element
+                yielded by *items* becomes the top of the stack.
         """
         self._data: List[T] = list(items) if items is not None else []
 
-    def push(self, item: T) -> Stack[T]:
-        """
-        Push an item onto the top of the stack.
+    # ------------------------------------------------------------------
+    # Factories
+    # ------------------------------------------------------------------
 
-        Args:
-            item (T): The item to add to the stack.
+    @classmethod
+    def of(cls, *items: T) -> "Stack[T]":
+        """Create a Stack from positional arguments."""
+        return cls(items)
 
-        Returns:
-            Stack[T]: The current Stack instance to allow method chaining.
-        """
+    @classmethod
+    def empty(cls) -> "Stack[T]":
+        """Create an empty Stack."""
+        return cls()
+
+    # ------------------------------------------------------------------
+    # Core operations
+    # ------------------------------------------------------------------
+
+    def push(self, item: T) -> "Stack[T]":
+        """Push *item* onto the top (O(1))."""
         self._data.append(item)
+        return self
+
+    def push_all(self, items: Iterable[T]) -> "Stack[T]":
+        """Push all elements of *items* in iteration order."""
+        self._data.extend(items)
         return self
 
     def pop(self) -> T:
         """
-        Remove and return the item at the top of the stack.
+        Remove and return the top element (O(1)).
 
         Raises:
-            IndexError: If the stack is empty when pop is called.
-
-        Returns:
-            T: The item that was at the top of the stack.
+            IndexError: If the stack is empty.
         """
         if not self._data:
             raise IndexError("pop from empty Stack")
         return self._data.pop()
 
-    def peek(self) -> Optional[T]:
-        """
-        Return the item at the top of the stack without removing it.
+    def pop_or(self, default: T) -> T:
+        """Remove and return the top element, or *default* if empty."""
+        return self._data.pop() if self._data else default
 
-        Returns:
-            Optional[T]: The item at the top of the stack, or None if the stack is empty.
-        """
+    def peek(self) -> Optional[T]:
+        """Return the top element without removing it, or ``None`` if empty."""
         return self._data[-1] if self._data else None
 
-    def is_empty(self) -> bool:
-        """
-        Check if the stack has no items.
-
-        Returns:
-            bool: True if the stack is empty, False otherwise.
-        """
-        return len(self._data) == 0
-
-    def size(self) -> int:
-        """
-        Get the total number of items currently in the stack.
-
-        Returns:
-            int: The size of the stack.
-        """
-        return len(self._data)
-
-    def clear(self) -> Stack[T]:
-        """
-        Remove all items from the stack.
-
-        Returns:
-            Stack[T]: The current Stack instance to allow method chaining.
-        """
+    def clear(self) -> "Stack[T]":
+        """Remove all elements."""
         self._data.clear()
         return self
 
-    def to_list(self) -> List[T]:
-        """
-        Convert the stack into a standard list.
+    # ------------------------------------------------------------------
+    # Inspection
+    # ------------------------------------------------------------------
 
-        Returns:
-            List[T]: A copy of the underlying items, ordered from bottom to top.
-        """
+    def is_empty(self) -> bool:
+        return not self._data
+
+    def size(self) -> int:
+        return len(self._data)
+
+    # ------------------------------------------------------------------
+    # Stream interop
+    # ------------------------------------------------------------------
+
+    def stream(self) -> "Stream[T]":
+        """Return a :class:`~nestifypy.collections.stream.Stream` (bottom-to-top order)."""
+        from nestifypy.collections.stream import Stream
+        return Stream(list(self._data))
+
+    # ------------------------------------------------------------------
+    # Conversion
+    # ------------------------------------------------------------------
+
+    def to_list(self) -> List[T]:
+        """Return a copy ordered from bottom to top."""
         return list(self._data)
 
-    def __iter__(self) -> Iterator[T]:
-        """
-        Iterate over the items in the stack from bottom to top.
+    # ------------------------------------------------------------------
+    # Dunder helpers
+    # ------------------------------------------------------------------
 
-        Returns:
-            Iterator[T]: An iterator over the stack's elements.
-        """
+    def __iter__(self) -> Iterator[T]:
         return iter(self._data)
 
     def __len__(self) -> int:
-        """
-        Get the number of items in the stack (allows `len(stack)`).
-
-        Returns:
-            int: The size of the stack.
-        """
         return len(self._data)
 
     def __contains__(self, item: Any) -> bool:
-        """
-        Check if an item is in the stack (allows `item in stack`).
-
-        Args:
-            item (Any): The item to check for.
-
-        Returns:
-            bool: True if the item exists in the stack, False otherwise.
-        """
         return item in self._data
 
-    def __repr__(self) -> str:
-        """
-        Get the string representation of the Stack.
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Stack):
+            return self._data == other._data
+        return NotImplemented
 
-        Returns:
-            str: A string showing the class name and its elements from bottom to top.
-        """
-        return f"Stack({self._data})"
+    def __repr__(self) -> str:
+        return f"Stack({self._data!r})"
+
+
+if TYPE_CHECKING:
+    from nestifypy.collections.stream import Stream

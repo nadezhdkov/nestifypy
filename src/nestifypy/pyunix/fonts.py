@@ -1,13 +1,12 @@
 """
 nestifypy.pyunix.fonts
--------------------
-Font asset management and caching system.
+----------------------
+Font registry: load .ttf/.otf files by name and retrieve at any size with caching.
 """
-
 from __future__ import annotations
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 try:
     import pygame
@@ -17,55 +16,41 @@ except ImportError:
 
 
 class FontSystem:
-    """
-    Manages loading and caching of fonts at various sizes.
-    """
-    __slots__ = ("_paths", "_cache", "_default_font")
+    __slots__ = ("_paths", "_cache")
 
-    def __init__(self):
-        self._paths: Dict[str, str] = {}
+    def __init__(self) -> None:
+        self._paths: Dict[str, str]           = {}
         self._cache: Dict[str, Dict[int, Any]] = {}
-        self._default_font: Any = None
 
     def load(self, name: str, path: str) -> None:
-        """Register a font path under a specific name."""
+        """Register a font file under `name`."""
         if not os.path.exists(path):
             raise FileNotFoundError(f"Font file not found: {path}")
         self._paths[name] = path
-        if name not in self._cache:
-            self._cache[name] = {}
+        self._cache.setdefault(name, {})
 
-    def get(self, name: str, size: int) -> Any:
-        """
-        Get a loaded pygame.font.Font object.
-        If the size hasn't been loaded yet, it loads and caches it.
-        """
+    def get(self, name: str, size: int) -> Optional[Any]:
+        """Return a cached (or freshly loaded) pygame Font object."""
         if not _HAS_PYGAME:
             return None
-
         if not pygame.font.get_init():
             pygame.font.init()
 
-        # Fallback to default pygame font if not found
         if name not in self._paths:
-            print(f"Warning: Font '{name}' not found. Using default.")
-            return pygame.font.Font(None, size)
+            return None  # Caller will use fallback
 
-        # Return cached
-        if size in self._cache[name]:
-            return self._cache[name][size]
-
-        # Load and cache
-        path = self._paths[name]
-        font = pygame.font.Font(path, size)
-        self._cache[name][size] = font
-        return font
+        cache = self._cache.setdefault(name, {})
+        if size not in cache:
+            cache[size] = pygame.font.Font(self._paths[name], size)
+        return cache[size]
 
     def clear(self) -> None:
-        """Clear the font cache."""
-        self._cache.clear()
-        for name in self._paths:
+        for name in self._cache:
             self._cache[name] = {}
+
+    @property
+    def registered(self) -> list:
+        return list(self._paths.keys())
 
 
 Fonts = FontSystem()

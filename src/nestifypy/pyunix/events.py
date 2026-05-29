@@ -1,108 +1,82 @@
 """
 nestifypy.pyunix.events
---------------------
-Decoupled event bus for game-wide communication.
-
-This module implements a simple Publisher/Subscriber (Pub/Sub) pattern.
-It allows different systems (like UI, physics, and gameplay logic) to communicate
-without needing direct references to each other, improving modularity.
+-----------------------
+Type-safe Pub/Sub event bus for decoupled game-wide communication.
 
 Usage:
     @Event.on("player_death")
-    def handle_death(data):
-        print(f"Player died. Score: {data['score']}")
+    def handle_death(data): ...
 
     Event.emit("player_death", {"score": 100})
+    Event.emit_deferred("level_complete")   # fires next frame
+    Event.flush()                           # process deferred events
 """
-
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Deque, Dict, List, Optional, Tuple
+from collections import deque
 
 
 class EventBus:
-    """
-    Central event dispatch system.
-
-    Provides decorators to register listener functions and runtime methods
-    to emit events globally across the application.
-    """
 
     def __init__(self) -> None:
-        """Initialize the EventBus with an empty listener dictionary."""
         self._listeners: Dict[str, List[Callable]] = {}
+        self._deferred:  Deque[Tuple[str, Any]]    = deque()
 
     def on(self, event_name: str) -> Callable:
-        """
-        Decorator to register a function as a listener for a specific event.
-
-        Args:
-            event_name (str): The name of the event to listen for.
-
-        Returns:
-            Callable: The decorator function.
-        """
+        """Decorator: register a listener for `event_name`."""
         def decorator(func: Callable) -> Callable:
-            if event_name not in self._listeners:
-                self._listeners[event_name] = []
-            self._listeners[event_name].append(func)
+            self._listeners.setdefault(event_name, []).append(func)
             func._pyunix_event = event_name
             return func
         return decorator
 
-    def emit(self, event_name: str, data: Any = None) -> None:
-        """
-        Dispatch an event to all registered listeners.
-
-        Args:
-            event_name (str): The name of the event to emit.
-            data (Any, optional): The payload to pass to the listener functions.
-                If None, the listeners are called without arguments. Defaults to None.
-        """
-        for callback in self._listeners.get(event_name, []):
-            if data is not None:
-                callback(data)
-            else:
-                callback()
-
-    def remove(self, event_name: str, func: Callable) -> None:
-        """
-        Remove a specific listener function from an event.
-
-        Args:
-            event_name (str): The name of the event.
-            func (Callable): The specific function reference to unregister.
-        """
+    def off(self, event_name: str, func: Callable) -> None:
+        """Unregister a specific listener."""
         if event_name in self._listeners:
             self._listeners[event_name] = [
                 f for f in self._listeners[event_name] if f is not func
             ]
 
-    def clear(self, event_name: str = None) -> None:
-        """
-        Clear listeners for a specific event, or all events if no name is provided.
+    def once(self, event_name: str) -> Callable:
+        """Decorator: register a listener that fires only once."""
+        def decorator(func: Callable) -> Callable:
+            def wrapper(*args: Any, **kwargs: Any) -> None:
+                func(*args, **kwargs)
+                self.off(event_name, wrapper)
+            self._listeners.setdefault(event_name, []).append(wrapper)
+            return func
+        return decorator
 
-        Args:
-            event_name (str, optional): The name of the event to clear.
-                If None, flushes the entire event bus. Defaults to None.
-        """
+    def emit(self, event_name: str, data: Any = None) -> None:
+        """Immediately fire all listeners for `event_name`."""
+        for cb in list(self._listeners.get(event_name, [])):
+            if data is not None:
+                cb(data)
+            else:
+                cb()
+
+    def emit_deferred(self, event_name: str, data: Any = None) -> None:
+        """Queue an event to be fired on the next `flush()` call."""
+        self._deferred.append((event_name, data))
+
+    def flush(self) -> None:
+        """Process all deferred events (called automatically each frame by the engine)."""
+        while self._deferred:
+            name, data = self._deferred.popleft()
+            self.emit(name, data)
+
+    def clear(self, event_name: Optional[str] = None) -> None:
         if event_name:
             self._listeners.pop(event_name, None)
         else:
             self._listeners.clear()
 
     def listeners(self, event_name: str) -> List[Callable]:
-        """
-        Return a list of all currently registered listeners for an event.
-
-        Args:
-            event_name (str): The name of the event to query.
-
-        Returns:
-            List[Callable]: A list of functions registered to the event.
-        """
         return list(self._listeners.get(event_name, []))
 
+    def has_listeners(self, event_name: str) -> bool:
+        return bool(self._listeners.get(event_name))
 
-# Global singleton
+
 Event = EventBus()

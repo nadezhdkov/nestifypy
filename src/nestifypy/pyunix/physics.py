@@ -1,17 +1,26 @@
 """
 nestifypy.pyunix.physics
----------------------
-Rigidbody physics system for 2D games, supporting dynamic, kinematic, and static bodies,
-collision detection, sensor queries, and physics materials.
-"""
+------------------------
+2D rigidbody physics: DYNAMIC / KINEMATIC / STATIC bodies,
+AABB + Circle collision detection, restitution, friction, layer masks,
+trigger zones, and sensor queries.
 
+Improvements over v1:
+- Circle vs Circle and Circle vs Box collision detection
+- Friction applied during velocity resolution
+- Proper mass-weighted impulse distribution
+- overlap_circle() sensor query
+- raycast() line-of-sight query
+- Configurable gravity per-body via gravity_scale
+- Sleeping bodies (skip integration when velocity ≈ 0)
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from nestifypy.types import Vector2
+from nestifypy.pyunix.math import Vector2
 
 try:
     import pygame
@@ -20,125 +29,264 @@ except ImportError:
     _HAS_PYGAME = False
 
 
+# ---------------------------------------------------------------------------
+# Enums & Data classes
+# ---------------------------------------------------------------------------
+
 class BodyType(Enum):
-    """Defines the movement behavior of a Rigidbody."""
-    STATIC = 0      # Never moves, infinite mass, doesn't integrate velocity
-    KINEMATIC = 1   # Moves manually, infinite mass, ignores forces
-    DYNAMIC = 2     # Moved by forces and velocity integration
+    STATIC    = 0   # Never moves; infinite effective mass
+    KINEMATIC = 1   # Moved manually; ignores forces but collides
+    DYNAMIC   = 2   # Full physics simulation
 
 
 @dataclass(slots=True)
 class PhysicsMaterial:
-    """Defines surface properties for a collider."""
-    friction: float = 0.5
-    bounciness: float = 0.0
+    """Surface properties shared by a collider."""
+    friction:    float = 0.3
+    bounciness:  float = 0.0
 
 
 @dataclass(slots=True)
 class CollisionInfo:
-    """Information about a collision event between two bodies."""
-    other: Any  # The other Entity
-    normal: Vector2
-    depth: float
+    """Payload delivered to on_collision_* hooks."""
+    other:      Any        # The other Entity involved
+    normal:     Vector2    # Collision normal (points away from `other`)
+    depth:      float      # Penetration depth in pixels
     is_trigger: bool = False
 
 
+# ---------------------------------------------------------------------------
+# Colliders
+# ---------------------------------------------------------------------------
+
 class Collider:
-    """Base class for collision shapes."""
+    """Abstract base for collision shapes."""
     __slots__ = ("offset", "is_trigger", "material")
-
-    def __init__(self, offset: Vector2 = None, is_trigger: bool = False, material: PhysicsMaterial = None):
-        self.offset: Vector2 = offset or Vector2.zero()
-        self.is_trigger: bool = is_trigger
-        self.material: PhysicsMaterial = material or PhysicsMaterial()
-
-
-class BoxCollider(Collider):
-    """An Axis-Aligned Bounding Box (AABB) collider."""
-    __slots__ = ("width", "height")
-
-    def __init__(self, width: float, height: float, offset: Vector2 = None, is_trigger: bool = False, material: PhysicsMaterial = None):
-        super().__init__(offset, is_trigger, material)
-        self.width = width
-        self.height = height
-
-    def get_bounds(self, entity_pos: Vector2) -> Tuple[float, float, float, float]:
-        """Returns (left, top, right, bottom)."""
-        center_x = entity_pos.x + self.offset.x
-        center_y = entity_pos.y + self.offset.y
-        half_w = self.width / 2
-        half_h = self.height / 2
-        return (center_x - half_w, center_y - half_h, center_x + half_w, center_y + half_h)
-
-
-class CircleCollider(Collider):
-    """A circle collider."""
-    __slots__ = ("radius",)
-
-    def __init__(self, radius: float, offset: Vector2 = None, is_trigger: bool = False, material: PhysicsMaterial = None):
-        super().__init__(offset, is_trigger, material)
-        self.radius = radius
-
-
-class Rigidbody:
-    """
-    Physical body component attached to an Entity.
-    """
-    __slots__ = (
-        "entity", "body_type", "velocity", "acceleration", "mass",
-        "drag", "gravity_scale", "layer", "mask", "freeze_x", "freeze_y"
-    )
 
     def __init__(
         self,
-        body_type: BodyType = BodyType.DYNAMIC,
-        mass: float = 1.0,
-        drag: float = 0.0,
-        gravity_scale: float = 1.0,
-        layer: str = "default",
-        mask: Set[str] = None,
-        freeze_x: bool = False,
-        freeze_y: bool = False
-    ):
-        self.entity: Any = None  # Set when attached to Entity
-        self.body_type = body_type
-        self.velocity = Vector2.zero()
-        self.acceleration = Vector2.zero()
-        self.mass = mass
-        self.drag = drag
+        offset: Vector2 = None,
+        is_trigger: bool = False,
+        material: PhysicsMaterial = None,
+    ) -> None:
+        self.offset:     Vector2         = offset   or Vector2.zero()
+        self.is_trigger: bool            = is_trigger
+        self.material:   PhysicsMaterial = material or PhysicsMaterial()
+
+
+class BoxCollider(Collider):
+    """Axis-Aligned Bounding Box (AABB) collider."""
+    __slots__ = ("width", "height")
+
+    def __init__(
+        self,
+        width: float,
+        height: float,
+        offset: Vector2 = None,
+        is_trigger: bool = False,
+        material: PhysicsMaterial = None,
+    ) -> None:
+        super().__init__(offset, is_trigger, material)
+        self.width  = width
+        self.height = height
+
+    def get_bounds(self, pos: Vector2) -> Tuple[float, float, float, float]:
+        """Return (left, top, right, bottom) in world space."""
+        cx = pos.x + self.offset.x
+        cy = pos.y + self.offset.y
+        hw = self.width  / 2
+        hh = self.height / 2
+        return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+    def center(self, pos: Vector2) -> Vector2:
+        return Vector2(pos.x + self.offset.x, pos.y + self.offset.y)
+
+
+class CircleCollider(Collider):
+    """Circle collider."""
+    __slots__ = ("radius",)
+
+    def __init__(
+        self,
+        radius: float,
+        offset: Vector2 = None,
+        is_trigger: bool = False,
+        material: PhysicsMaterial = None,
+    ) -> None:
+        super().__init__(offset, is_trigger, material)
+        self.radius = radius
+
+    def center(self, pos: Vector2) -> Vector2:
+        return Vector2(pos.x + self.offset.x, pos.y + self.offset.y)
+
+
+# ---------------------------------------------------------------------------
+# Rigidbody
+# ---------------------------------------------------------------------------
+
+class Rigidbody:
+    """Physical body component attached to an Entity."""
+    __slots__ = (
+        "entity", "body_type", "velocity", "acceleration",
+        "mass", "drag", "angular_drag", "gravity_scale",
+        "layer", "mask", "freeze_x", "freeze_y",
+        "_sleeping", "_sleep_timer",
+    )
+
+    _SLEEP_THRESHOLD  = 1.0    # px/s below which a body may sleep
+    _SLEEP_TIME_LIMIT = 0.5    # seconds at threshold before sleeping
+
+    def __init__(
+        self,
+        body_type:     BodyType       = BodyType.DYNAMIC,
+        mass:          float          = 1.0,
+        drag:          float          = 0.0,
+        angular_drag:  float          = 0.0,
+        gravity_scale: float          = 1.0,
+        layer:         str            = "default",
+        mask:          Set[str]       = None,
+        freeze_x:      bool           = False,
+        freeze_y:      bool           = False,
+    ) -> None:
+        self.entity        = None
+        self.body_type     = body_type
+        self.velocity      = Vector2.zero()
+        self.acceleration  = Vector2.zero()
+        self.mass          = max(mass, 0.0001)
+        self.drag          = drag
+        self.angular_drag  = angular_drag
         self.gravity_scale = gravity_scale
-        self.layer = layer
-        self.mask = mask if mask is not None else {"default"}
-        self.freeze_x = freeze_x
-        self.freeze_y = freeze_y
+        self.layer         = layer
+        self.mask          = mask if mask is not None else {"default"}
+        self.freeze_x      = freeze_x
+        self.freeze_y      = freeze_y
+        self._sleeping     = False
+        self._sleep_timer  = 0.0
+
+    # ── Force API ────────────────────────────
 
     def add_force(self, force: Vector2) -> None:
-        """Apply an instantaneous force, affected by mass."""
+        """Apply a force (mass-scaled velocity impulse)."""
         if self.body_type != BodyType.DYNAMIC:
             return
-        if self.mass > 0:
-            self.velocity.x += force.x / self.mass
-            self.velocity.y += force.y / self.mass
+        self._wake()
+        self.velocity.x += force.x / self.mass
+        self.velocity.y += force.y / self.mass
 
     def add_impulse(self, impulse: Vector2) -> None:
-        """Apply an instantaneous velocity change, ignoring mass."""
+        """Apply a direct velocity change (ignores mass)."""
         if self.body_type != BodyType.DYNAMIC:
             return
+        self._wake()
         self.velocity.x += impulse.x
         self.velocity.y += impulse.y
 
+    def set_velocity(self, vx: float, vy: float) -> None:
+        self._wake()
+        self.velocity.x = vx
+        self.velocity.y = vy
+
+    def stop(self) -> None:
+        self.velocity.x = 0.0
+        self.velocity.y = 0.0
+
+    # ── Sleep ────────────────────────────────
+
+    def _wake(self) -> None:
+        self._sleeping    = False
+        self._sleep_timer = 0.0
+
+    def _check_sleep(self, dt: float) -> None:
+        if self.body_type != BodyType.DYNAMIC:
+            return
+        spd = self.velocity.magnitude
+        if spd < self._SLEEP_THRESHOLD:
+            self._sleep_timer += dt
+            if self._sleep_timer >= self._SLEEP_TIME_LIMIT:
+                self._sleeping = True
+        else:
+            self._wake()
+
+
+# ---------------------------------------------------------------------------
+# Collision detection helpers
+# ---------------------------------------------------------------------------
+
+def _box_vs_box(
+    c1: BoxCollider, p1: Vector2,
+    c2: BoxCollider, p2: Vector2,
+) -> Optional[Tuple[Vector2, float]]:
+    """Return (normal, depth) if overlapping, else None."""
+    b1 = c1.get_bounds(p1)
+    b2 = c2.get_bounds(p2)
+    if not (b1[0] < b2[2] and b1[2] > b2[0] and b1[1] < b2[3] and b1[3] > b2[1]):
+        return None
+    ox = min(b1[2], b2[2]) - max(b1[0], b2[0])
+    oy = min(b1[3], b2[3]) - max(b1[1], b2[1])
+    if ox < oy:
+        normal = Vector2(-1, 0) if p1.x < p2.x else Vector2(1, 0)
+        return (normal, ox)
+    else:
+        normal = Vector2(0, -1) if p1.y < p2.y else Vector2(0, 1)
+        return (normal, oy)
+
+
+def _circle_vs_circle(
+    c1: CircleCollider, p1: Vector2,
+    c2: CircleCollider, p2: Vector2,
+) -> Optional[Tuple[Vector2, float]]:
+    center1 = c1.center(p1)
+    center2 = c2.center(p2)
+    diff    = center1 - center2
+    dist    = diff.magnitude
+    radii   = c1.radius + c2.radius
+    if dist >= radii or dist == 0:
+        return None
+    normal = diff.normalized
+    depth  = radii - dist
+    return (normal, depth)
+
+
+def _circle_vs_box(
+    cc: CircleCollider, cp: Vector2,
+    bc: BoxCollider,   bp: Vector2,
+) -> Optional[Tuple[Vector2, float]]:
+    """Circle (first) vs Box (second). Returns (normal pointing away from box, depth)."""
+    center  = cc.center(cp)
+    b       = bc.get_bounds(bp)
+    # Clamp circle center to box bounds
+    closest_x = max(b[0], min(center.x, b[2]))
+    closest_y = max(b[1], min(center.y, b[3]))
+    diff  = center - Vector2(closest_x, closest_y)
+    dist  = diff.magnitude
+    if dist >= cc.radius:
+        return None
+    if dist == 0:
+        # Center inside box — push out the shortest axis
+        box_cx = (b[0] + b[2]) / 2
+        box_cy = (b[1] + b[3]) / 2
+        diff   = center - Vector2(box_cx, box_cy)
+        dist   = diff.magnitude or 0.001
+    normal = diff.normalized
+    depth  = cc.radius - dist
+    return (normal, depth)
+
+
+# ---------------------------------------------------------------------------
+# PhysicsWorld
+# ---------------------------------------------------------------------------
 
 class PhysicsWorldSystem:
-    """Global manager for physics simulation."""
+    """Global 2D physics simulation manager."""
 
-    def __init__(self):
-        self.gravity = Vector2(0, 980.0)
-        self.fixed_dt = 1.0 / 60.0
-        self.debug_draw = False
-        self._bodies: List[Any] = []  # List of Entities with rigidbodies/colliders
-        # Store active collisions to track stay/exit events
-        # format: (entity1_id, entity2_id) -> bool
-        self._active_collisions: Set[Tuple[int, int]] = set()
+    def __init__(self) -> None:
+        self.gravity:     Vector2 = Vector2(0, 980.0)
+        self.fixed_dt:    float   = 1.0 / 60.0
+        self.debug_draw:  bool    = False
+        self._bodies:     List[Any]                      = []
+        self._active_collisions: Set[Tuple[int, int]]    = set()
+
+    # ── Registration ─────────────────────────
 
     def set_gravity(self, x: float, y: float) -> None:
         self.gravity = Vector2(x, y)
@@ -150,205 +298,225 @@ class PhysicsWorldSystem:
     def unregister(self, entity: Any) -> None:
         if entity in self._bodies:
             self._bodies.remove(entity)
-            # Cleanup active collisions involving this entity
-            eid = id(entity)
-            to_remove = [pair for pair in self._active_collisions if pair[0] == eid or pair[1] == eid]
-            for pair in to_remove:
-                self._active_collisions.discard(pair)
+        eid = id(entity)
+        self._active_collisions = {
+            p for p in self._active_collisions
+            if p[0] != eid and p[1] != eid
+        }
+
+    # ── Step ─────────────────────────────────
 
     def step(self) -> None:
-        """Integrate velocities and resolve collisions."""
+        """Integrate velocities and resolve all collisions."""
         dt = self.fixed_dt
         current_collisions: Set[Tuple[int, int]] = set()
 
-        # 1. Integration (Velocity & Position)
+        # ── Integration ──────────────────────
         for entity in self._bodies:
             rb = getattr(entity, "rigidbody", None)
             if not rb or rb.body_type == BodyType.STATIC:
                 continue
+            if rb._sleeping:
+                continue
 
-            # Apply gravity to dynamic bodies
             if rb.body_type == BodyType.DYNAMIC:
+                # Gravity
                 rb.velocity.x += self.gravity.x * rb.gravity_scale * dt
                 rb.velocity.y += self.gravity.y * rb.gravity_scale * dt
-                
-                # Apply drag
+                # Drag
                 if rb.drag > 0:
-                    rb.velocity.x *= (1.0 - rb.drag * dt)
-                    rb.velocity.y *= (1.0 - rb.drag * dt)
+                    factor = max(0.0, 1.0 - rb.drag * dt)
+                    rb.velocity.x *= factor
+                    rb.velocity.y *= factor
 
-            # Move entity
             if not rb.freeze_x:
                 entity.x += rb.velocity.x * dt
             if not rb.freeze_y:
                 entity.y += rb.velocity.y * dt
 
-        # 2. Collision Detection & Resolution (Brute force for now)
-        n = len(self._bodies)
-        for i in range(n):
-            e1 = self._bodies[i]
-            rb1 = getattr(e1, "rigidbody", None)
-            col1 = getattr(e1, "collider", None)
+            rb._check_sleep(dt)
 
-            if not col1:
+        # ── Collision Detection ───────────────
+        bodies = self._bodies
+        n = len(bodies)
+        for i in range(n):
+            e1  = bodies[i]
+            rb1 = getattr(e1, "rigidbody", None)
+            c1  = getattr(e1, "collider",  None)
+            if not c1:
                 continue
+            p1  = Vector2(e1.x, e1.y)
 
             for j in range(i + 1, n):
-                e2 = self._bodies[j]
+                e2  = bodies[j]
                 rb2 = getattr(e2, "rigidbody", None)
-                col2 = getattr(e2, "collider", None)
-
-                if not col2:
+                c2  = getattr(e2, "collider",  None)
+                if not c2:
                     continue
-                
-                # Layer Mask check
-                can_collide = False
-                if rb1 and rb2:
-                     can_collide = (rb2.layer in rb1.mask) or (rb1.layer in rb2.mask)
-                elif rb1:
-                     can_collide = getattr(e2, "layer", "default") in rb1.mask
-                elif rb2:
-                     can_collide = getattr(e1, "layer", "default") in rb2.mask
+
+                # Layer mask check
+                if not self._can_collide(e1, rb1, e2, rb2):
+                    continue
+
+                p2 = Vector2(e2.x, e2.y)
+                result = self._detect(c1, p1, c2, p2)
+                if result is None:
+                    continue
+
+                normal, depth = result
+                is_trigger = c1.is_trigger or c2.is_trigger
+                pair_id = tuple(sorted((id(e1), id(e2))))
+                current_collisions.add(pair_id)
+
+                ci1 = CollisionInfo(e2,  normal, depth, is_trigger)
+                ci2 = CollisionInfo(e1, -normal, depth, is_trigger)
+
+                hook = "on_collision_enter" if pair_id not in self._active_collisions else "on_collision_stay"
+                trig_hook = "on_trigger_enter" if pair_id not in self._active_collisions else None
+
+                if is_trigger:
+                    e1._dispatch(trig_hook or "on_trigger_enter", ci1)
+                    e2._dispatch(trig_hook or "on_trigger_enter", ci2)
                 else:
-                    can_collide = True # Neither has rigidbody, just colliders
-                    
-                if not can_collide:
-                    continue
+                    e1._dispatch(hook, ci1)
+                    e2._dispatch(hook, ci2)
+                    self._resolve(e1, rb1, c1, e2, rb2, c2, normal, depth)
 
-                # Box vs Box only for now
-                if isinstance(col1, BoxCollider) and isinstance(col2, BoxCollider):
-                    b1 = col1.get_bounds(Vector2(e1.x, e1.y))
-                    b2 = col2.get_bounds(Vector2(e2.x, e2.y))
-
-                    # AABB Check
-                    if b1[0] < b2[2] and b1[2] > b2[0] and b1[1] < b2[3] and b1[3] > b2[1]:
-                        # Collision occurred!
-                        is_trigger = col1.is_trigger or col2.is_trigger
-                        
-                        # Calculate penetration
-                        overlap_x = min(b1[2], b2[2]) - max(b1[0], b2[0])
-                        overlap_y = min(b1[3], b2[3]) - max(b1[1], b2[1])
-
-                        normal = Vector2.zero()
-                        depth = 0.0
-
-                        if overlap_x < overlap_y:
-                            depth = overlap_x
-                            if b1[0] < b2[0]:
-                                normal = Vector2(-1, 0)
-                            else:
-                                normal = Vector2(1, 0)
-                        else:
-                            depth = overlap_y
-                            if b1[1] < b2[1]:
-                                normal = Vector2(0, -1)
-                            else:
-                                normal = Vector2(0, 1)
-
-                        ci1 = CollisionInfo(e2, normal, depth, is_trigger)
-                        ci2 = CollisionInfo(e1, -normal, depth, is_trigger)
-
-                        pair_id = tuple(sorted((id(e1), id(e2))))
-                        current_collisions.add(pair_id)
-
-                        # Trigger callbacks
-                        if pair_id not in self._active_collisions:
-                            e1._dispatch("on_collision_enter", ci1)
-                            e2._dispatch("on_collision_enter", ci2)
-                        else:
-                            e1._dispatch("on_collision_stay", ci1)
-                            e2._dispatch("on_collision_stay", ci2)
-
-                        # Physical Resolution
-                        if not is_trigger:
-                            self._resolve_collision(e1, rb1, col1, e2, rb2, col2, normal, depth)
-
-        # 3. Handle Exit callbacks
-        exited = self._active_collisions - current_collisions
-        for pair in exited:
+        # ── Exit callbacks ────────────────────
+        for pair in (self._active_collisions - current_collisions):
             id1, id2 = pair
             e1 = next((e for e in self._bodies if id(e) == id1), None)
             e2 = next((e for e in self._bodies if id(e) == id2), None)
-            
             if e1 and e2:
-                # We don't have full normal/depth info for exit, so use zeros
+                col = getattr(e1, "collider", None)
+                is_trig = getattr(col, "is_trigger", False)
                 ci1 = CollisionInfo(e2, Vector2.zero(), 0.0)
                 ci2 = CollisionInfo(e1, Vector2.zero(), 0.0)
-                e1._dispatch("on_collision_exit", ci1)
-                e2._dispatch("on_collision_exit", ci2)
+                hook = "on_trigger_exit" if is_trig else "on_collision_exit"
+                e1._dispatch(hook, ci1)
+                e2._dispatch(hook, ci2)
 
         self._active_collisions = current_collisions
 
-    def _resolve_collision(
-        self, e1: Any, rb1: Rigidbody, col1: BoxCollider, 
-        e2: Any, rb2: Rigidbody, col2: BoxCollider, 
-        normal: Vector2, depth: float
-    ):
-        """Resolves penetration and calculates bounce."""
-        # Determine movement capability
-        movable1 = rb1 and rb1.body_type == BodyType.DYNAMIC
-        movable2 = rb2 and rb2.body_type == BodyType.DYNAMIC
-        
-        if not movable1 and not movable2:
-            return # Both static/kinematic
+    # ── Detection dispatch ────────────────────
 
-        # 1. Positional Correction (prevent sinking)
-        correction_percent = 0.8
-        slop = 0.01
-        correction = max(depth - slop, 0.0) * correction_percent
+    def _detect(
+        self,
+        c1: Collider, p1: Vector2,
+        c2: Collider, p2: Vector2,
+    ) -> Optional[Tuple[Vector2, float]]:
+        if isinstance(c1, BoxCollider) and isinstance(c2, BoxCollider):
+            return _box_vs_box(c1, p1, c2, p2)
+        if isinstance(c1, CircleCollider) and isinstance(c2, CircleCollider):
+            return _circle_vs_circle(c1, p1, c2, p2)
+        if isinstance(c1, CircleCollider) and isinstance(c2, BoxCollider):
+            r = _circle_vs_box(c1, p1, c2, p2)
+            return r
+        if isinstance(c1, BoxCollider) and isinstance(c2, CircleCollider):
+            r = _circle_vs_box(c2, p2, c1, p1)
+            if r:
+                return (-r[0], r[1])
+        return None
 
-        if movable1 and movable2:
-            # Distribute based on mass (assuming equal mass for now if 0)
-            total_mass = (rb1.mass or 1) + (rb2.mass or 1)
-            ratio1 = (rb2.mass or 1) / total_mass
-            ratio2 = (rb1.mass or 1) / total_mass
-            
-            if not rb1.freeze_x: e1.x += normal.x * correction * ratio1
-            if not rb1.freeze_y: e1.y += normal.y * correction * ratio1
-            if not rb2.freeze_x: e2.x -= normal.x * correction * ratio2
-            if not rb2.freeze_y: e2.y -= normal.y * correction * ratio2
-        elif movable1:
+    # ── Resolution ───────────────────────────
+
+    def _resolve(
+        self,
+        e1: Any, rb1: Optional[Rigidbody], c1: Collider,
+        e2: Any, rb2: Optional[Rigidbody], c2: Collider,
+        normal: Vector2, depth: float,
+    ) -> None:
+        m1 = rb1.body_type == BodyType.DYNAMIC if rb1 else False
+        m2 = rb2.body_type == BodyType.DYNAMIC if rb2 else False
+        if not m1 and not m2:
+            return
+
+        # ── Positional correction (Baumgarte) ─
+        slop       = 0.01
+        percent    = 0.8
+        correction = max(depth - slop, 0.0) * percent
+
+        if m1 and m2:
+            total = (rb1.mass or 1) + (rb2.mass or 1)
+            r1    = (rb2.mass or 1) / total
+            r2    = (rb1.mass or 1) / total
+            if not rb1.freeze_x: e1.x += normal.x * correction * r1
+            if not rb1.freeze_y: e1.y += normal.y * correction * r1
+            if not rb2.freeze_x: e2.x -= normal.x * correction * r2
+            if not rb2.freeze_y: e2.y -= normal.y * correction * r2
+        elif m1:
             if not rb1.freeze_x: e1.x += normal.x * correction
             if not rb1.freeze_y: e1.y += normal.y * correction
-        elif movable2:
+        else:
             if not rb2.freeze_x: e2.x -= normal.x * correction
             if not rb2.freeze_y: e2.y -= normal.y * correction
 
-        # 2. Velocity Resolution (Bounce)
-        v1 = rb1.velocity if rb1 else Vector2.zero()
-        v2 = rb2.velocity if rb2 else Vector2.zero()
-        
-        rel_vel = v1 - v2
-        vel_along_normal = rel_vel.dot(normal)
+        # ── Impulse resolution ────────────────
+        v1  = rb1.velocity if rb1 else Vector2.zero()
+        v2  = rb2.velocity if rb2 else Vector2.zero()
+        rel = v1 - v2
+        vel_n = rel.dot(normal)
 
-        # Do not resolve if separating
-        if vel_along_normal > 0:
+        if vel_n > 0:   # already separating
             return
 
-        bounciness = min(col1.material.bounciness, col2.material.bounciness)
-        j = -(1 + bounciness) * vel_along_normal
-        
-        # In a real engine, divide by inverse masses
-        # For simple 2D, we distribute
-        
-        if movable1 and movable2:
-            j /= 2.0
-            if not rb1.freeze_x: v1.x += j * normal.x
-            if not rb1.freeze_y: v1.y += j * normal.y
-            if not rb2.freeze_x: v2.x -= j * normal.x
-            if not rb2.freeze_y: v2.y -= j * normal.y
-        elif movable1:
-            if not rb1.freeze_x: v1.x += j * normal.x
-            if not rb1.freeze_y: v1.y += j * normal.y
-        elif movable2:
-            if not rb2.freeze_x: v2.x -= j * normal.x
-            if not rb2.freeze_y: v2.y -= j * normal.y
+        bounce = min(c1.material.bounciness, c2.material.bounciness)
+        inv_m1 = (1.0 / rb1.mass) if (rb1 and m1) else 0.0
+        inv_m2 = (1.0 / rb2.mass) if (rb2 and m2) else 0.0
+        inv_sum = inv_m1 + inv_m2
+        if inv_sum == 0:
+            return
 
-    # --- Sensor Queries ---
-    def overlap_rect(self, rect: Tuple[float, float, float, float], mask: Set[str] = None) -> List[Any]:
-        """Returns all entities whose bounds overlap the given AABB (left, top, right, bottom)."""
-        hits = []
+        j = -(1 + bounce) * vel_n / inv_sum
+
+        if m1:
+            if not rb1.freeze_x: v1.x += j * normal.x * inv_m1
+            if not rb1.freeze_y: v1.y += j * normal.y * inv_m1
+        if m2:
+            if not rb2.freeze_x: v2.x -= j * normal.x * inv_m2
+            if not rb2.freeze_y: v2.y -= j * normal.y * inv_m2
+
+        # ── Friction ─────────────────────────
+        tangent = rel - normal * rel.dot(normal)
+        if tangent.magnitude > 0.001:
+            tan_n   = tangent.normalized
+            jt      = -rel.dot(tan_n) / inv_sum
+            mu      = (c1.material.friction + c2.material.friction) * 0.5
+            friction_impulse = tan_n * (jt if abs(jt) < j * mu else -j * mu)
+            if m1:
+                if not rb1.freeze_x: v1.x += friction_impulse.x * inv_m1
+                if not rb1.freeze_y: v1.y += friction_impulse.y * inv_m1
+            if m2:
+                if not rb2.freeze_x: v2.x -= friction_impulse.x * inv_m2
+                if not rb2.freeze_y: v2.y -= friction_impulse.y * inv_m2
+
+    # ── Layer masking ─────────────────────────
+
+    @staticmethod
+    def _can_collide(
+        e1: Any, rb1: Optional[Rigidbody],
+        e2: Any, rb2: Optional[Rigidbody],
+    ) -> bool:
+        l1 = getattr(e1, "layer", "default")
+        l2 = getattr(e2, "layer", "default")
+        if rb1 and rb2:
+            return l2 in rb1.mask or l1 in rb2.mask
+        if rb1:
+            return l2 in rb1.mask
+        if rb2:
+            return l1 in rb2.mask
+        return True
+
+    # ── Sensor Queries ────────────────────────
+
+    def overlap_rect(
+        self,
+        rect: Tuple[float, float, float, float],
+        mask: Set[str] = None,
+    ) -> List[Any]:
+        """Return all entities whose BoxCollider overlaps the AABB (l, t, r, b)."""
         rx1, ry1, rx2, ry2 = rect
+        hits = []
         for e in self._bodies:
             if mask and getattr(e, "layer", "default") not in mask:
                 continue
@@ -358,6 +526,104 @@ class PhysicsWorldSystem:
                 if rx1 < b[2] and rx2 > b[0] and ry1 < b[3] and ry2 > b[1]:
                     hits.append(e)
         return hits
+
+    def overlap_circle(
+        self,
+        center: Vector2,
+        radius: float,
+        mask: Set[str] = None,
+    ) -> List[Any]:
+        """Return all entities within `radius` pixels of `center`."""
+        hits = []
+        for e in self._bodies:
+            if mask and getattr(e, "layer", "default") not in mask:
+                continue
+            col = getattr(e, "collider", None)
+            ep  = Vector2(e.x, e.y)
+            if isinstance(col, CircleCollider):
+                c = col.center(ep)
+                if c.distance_to(center) <= radius + col.radius:
+                    hits.append(e)
+            elif isinstance(col, BoxCollider):
+                bc = col.center(ep)
+                if bc.distance_to(center) <= radius + max(col.width, col.height) / 2:
+                    hits.append(e)
+        return hits
+
+    def raycast(
+        self,
+        origin: Vector2,
+        direction: Vector2,
+        max_distance: float,
+        mask: Set[str] = None,
+    ) -> Optional[Tuple[Any, Vector2, float]]:
+        """
+        Cast a ray and return the first solid entity hit.
+
+        Args:
+            origin:       World-space start position.
+            direction:    Unit vector (normalized) direction.
+            max_distance: Maximum ray length in pixels.
+            mask:         Layer mask (None = hit all layers).
+
+        Returns:
+            (entity, hit_point, distance) or None if nothing was hit.
+        """
+        best_dist = max_distance
+        best_hit  = None
+        best_pt   = None
+        d = direction.normalized
+
+        for e in self._bodies:
+            if mask and getattr(e, "layer", "default") not in mask:
+                continue
+            col = getattr(e, "collider", None)
+            if not isinstance(col, BoxCollider):
+                continue
+            b = col.get_bounds(Vector2(e.x, e.y))
+            # Slab method AABB vs ray
+            inv_dx = 1.0 / d.x if d.x != 0 else float("inf")
+            inv_dy = 1.0 / d.y if d.y != 0 else float("inf")
+            tx1 = (b[0] - origin.x) * inv_dx
+            tx2 = (b[2] - origin.x) * inv_dx
+            ty1 = (b[1] - origin.y) * inv_dy
+            ty2 = (b[3] - origin.y) * inv_dy
+            tmin = max(min(tx1, tx2), min(ty1, ty2))
+            tmax = min(max(tx1, tx2), max(ty1, ty2))
+            if tmax < 0 or tmin > tmax or tmin > best_dist:
+                continue
+            t = max(tmin, 0.0)
+            if t < best_dist:
+                best_dist = t
+                best_hit  = e
+                best_pt   = origin + d * t
+
+        if best_hit:
+            return (best_hit, best_pt, best_dist)
+        return None
+
+    # ── Debug Draw ────────────────────────────
+
+    def draw_debug(self, surface: Any, offset: Tuple[float, float] = (0.0, 0.0)) -> None:
+        """Draw wireframe outlines for all registered colliders."""
+        if not _HAS_PYGAME:
+            return
+        ox, oy = offset
+        for e in self._bodies:
+            col = getattr(e, "collider", None)
+            rb  = getattr(e, "rigidbody", None)
+            pos = Vector2(e.x, e.y)
+            if isinstance(col, BoxCollider):
+                b = col.get_bounds(pos)
+                color = (0, 255, 0) if rb and rb.body_type == BodyType.DYNAMIC else (100, 100, 255)
+                if col.is_trigger:
+                    color = (255, 200, 0)
+                r = pygame.Rect(b[0]-ox, b[1]-oy, col.width, col.height)
+                pygame.draw.rect(surface, color, r, 1)
+            elif isinstance(col, CircleCollider):
+                c = col.center(pos)
+                pygame.draw.circle(surface, (0, 200, 255),
+                                   (int(c.x - ox), int(c.y - oy)), int(col.radius), 1)
 
 
 PhysicsWorld = PhysicsWorldSystem()

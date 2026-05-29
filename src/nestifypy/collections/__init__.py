@@ -1,7 +1,47 @@
 """
 nestifypy.collections
-------------------
-Fluent, Java-inspired data structures.
+----------------------
+Fluent, Java-inspired data structures and functional utilities for Python.
+
+Quick start::
+
+    from nestifypy.collections import (
+        ArrayList, LinkedList, Stack, Queue,
+        OrderedSet, HashMap, Stream, Optional, Result,
+    )
+
+    # Fluent pipeline
+    result = (
+        Stream.range(1, 11)
+        .filter(lambda n: n % 2 == 0)
+        .map(lambda n: n ** 2)
+        .to_list()
+    )  # [4, 16, 36, 64, 100]
+
+    # Safe None handling
+    value = Optional.of_nullable(some_dict.get("key")).map(str.upper).get_or("default")
+
+    # Explicit error handling
+    parsed = Result.of(lambda: int(user_input)).get_or(0)
+
+Collections
+-----------
+- :class:`ArrayList`   — dynamic array with functional API
+- :class:`LinkedList`  — doubly-linked list (deque-backed)
+- :class:`Stack`       — LIFO stack
+- :class:`Queue`       — FIFO queue
+- :class:`OrderedSet`  — insertion-ordered unique elements
+- :class:`HashMap`     — fluent dict wrapper
+
+Functional utilities
+--------------------
+- :class:`Stream`      — lazy sequential pipeline (Java Streams style)
+- :class:`Optional`    — safe None container
+- :class:`Result`      — Ok/Err discriminated union for error handling
+
+Exceptions
+----------
+- :class:`StreamExhaustedException` — raised when a consumed Stream is reused
 """
 
 from nestifypy.collections.array_list import ArrayList
@@ -10,12 +50,22 @@ from nestifypy.collections.stack import Stack
 from nestifypy.collections.queue import Queue
 from nestifypy.collections.ordered_set import OrderedSet
 from nestifypy.collections.hash_map import HashMap
+from nestifypy.collections.stream import Stream, StreamExhaustedException
+from nestifypy.collections.optional import Optional
+from nestifypy.collections.result import Result
 
 __all__ = [
+    # Collections
     "ArrayList",
     "LinkedList",
     "Stack",
     "Queue",
     "OrderedSet",
     "HashMap",
+    # Functional utilities
+    "Stream",
+    "Optional",
+    "Result",
+    # Exceptions
+    "StreamExhaustedException",
 ]
